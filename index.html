@@ -1,0 +1,1285 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="data:," />
+    <title>手势粒子</title>
+    <style>
+      :root{
+        color-scheme: dark;
+        --ink:#f2f3ff;
+        --ink-dim:rgba(232,236,255,.88);
+        --ink-faint:rgba(226,230,255,.6);
+        --gold-ink:#1a1405;
+        --panel:rgba(10,13,32,.55);
+        --panel-line:rgba(180,190,255,.16);
+        --btn-hover:rgba(255,255,255,.12);
+      }
+      *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+      html,body{height:100%}
+      body{
+        margin:0;
+        overflow:hidden;
+        font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+        color:var(--ink);
+        background:#04060f;
+        touch-action:none;
+        overscroll-behavior:none;
+        user-select:none;
+        -webkit-user-select:none;
+      }
+      #scene{
+        position:fixed;inset:0;
+        width:100%;height:100%;
+        display:block;
+        cursor:crosshair;
+        touch-action:none;
+      }
+      .vignette{
+        position:fixed;inset:0;pointer-events:none;z-index:2;
+        background:radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(1,2,8,.55) 100%);
+      }
+
+      /* ---------- 顶部标题 ---------- */
+      header{
+        position:fixed;z-index:5;
+        top:0;left:0;right:0;
+        text-align:center;
+        pointer-events:none;
+        padding:calc(env(safe-area-inset-top, 0px) + 16px) 20px 30px;
+        background:linear-gradient(180deg, rgba(2,3,10,.66) 0%, rgba(2,3,10,.38) 55%, rgba(2,3,10,0) 100%);
+      }
+      header h1{
+        margin:0;
+        font-size:clamp(20px,3.2vw,28px);
+        font-weight:600;
+        letter-spacing:.42em;
+        text-indent:.42em;
+        color:var(--ink);
+        text-shadow:0 0 18px rgba(160,170,255,.5), 0 0 46px rgba(245,201,107,.25), 0 2px 12px rgba(0,0,0,.9);
+      }
+      header p{
+        display:inline-block;
+        margin:10px auto 0;
+        max-width:560px;
+        font-size:13.5px;
+        font-weight:600;
+        line-height:1.7;
+        letter-spacing:.05em;
+        color:#ffffff;
+        background:rgba(2,3,12,.82);
+        border:1px solid rgba(190,200,255,.14);
+        border-radius:999px;
+        padding:4px 16px;
+        text-shadow:0 1px 4px rgba(0,0,0,.6);
+        transition:opacity 1.2s ease;
+      }
+      header p.faded{opacity:.55}
+      #notice{
+        display:none;
+        margin:8px auto 0;
+        max-width:520px;
+        font-size:12.5px;font-weight:600;line-height:1.6;
+        color:#ffe1a8;
+        background:rgba(46,32,4,.85);
+        border:1px solid rgba(245,201,107,.35);
+        border-radius:10px;
+        padding:5px 14px;
+      }
+      #notice.show{display:inline-block}
+
+      /* ---------- 左上角：摄像头圆窗预览 + 状态 ---------- */
+      .cam-stack{
+        position:fixed;z-index:6;
+        top:calc(env(safe-area-inset-top, 0px) + 14px);
+        left:14px;
+        display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+        pointer-events:none;
+      }
+      .cam-preview{
+        width:88px;height:88px;border-radius:50%;
+        overflow:hidden;
+        border:2px solid rgba(200,210,255,.35);
+        box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 0 4px rgba(6,8,22,.45);
+        background:#0a0e24;
+        display:none;
+      }
+      .cam-preview.on{display:block}
+      .cam-preview video{
+        width:100%;height:100%;object-fit:cover;
+        transform:scaleX(-1); /* 镜像，像照镜子 */
+        display:block;
+      }
+      .status-chip{
+        pointer-events:auto;
+        background:rgba(2,3,12,.82);
+        border:1px solid rgba(190,200,255,.16);
+        border-radius:14px;
+        padding:7px 13px 8px;
+        max-width:200px;
+        backdrop-filter:blur(8px);
+        -webkit-backdrop-filter:blur(8px);
+      }
+      .status-chip .gesture{
+        font-size:16.5px;font-weight:700;letter-spacing:.06em;color:#fff;line-height:1.35;
+      }
+      .status-chip .mode-line{
+        margin-top:2px;
+        font-size:11px;letter-spacing:.1em;color:var(--ink-faint);line-height:1.5;
+      }
+      .status-chip .diag-line{
+        margin-top:3px;
+        font-size:10.5px;letter-spacing:.03em;line-height:1.55;
+        color:rgba(255,217,140,.92);
+        word-break:break-all;
+      }
+      #btnCamRetry{
+        display:none;
+        margin-top:6px;
+        appearance:none;cursor:pointer;
+        font:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;
+        color:var(--gold-ink);
+        background:linear-gradient(180deg,#ffd98c,#edb84e);
+        border:0;border-radius:999px;padding:6px 14px;
+      }
+      #btnCamRetry.show{display:inline-block}
+      #btnCamRetry:focus-visible{outline:2px solid rgba(245,201,107,.8);outline-offset:2px}
+
+      /* ---------- 底部图形切换 ---------- */
+      .controls{
+        position:fixed;z-index:6;
+        left:50%;transform:translateX(-50%);
+        bottom:calc(env(safe-area-inset-bottom, 0px) + 18px);
+        display:flex;align-items:stretch;gap:10px;
+        max-width:calc(100vw - 20px);
+      }
+      .panel{
+        display:flex;align-items:center;gap:4px;
+        background:var(--panel);
+        border:1px solid var(--panel-line);
+        border-radius:999px;
+        padding:5px;
+        backdrop-filter:blur(14px) saturate(1.3);
+        -webkit-backdrop-filter:blur(14px) saturate(1.3);
+        box-shadow:0 10px 34px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+      }
+      .panel .label{
+        font-size:11px;letter-spacing:.14em;color:var(--ink-faint);
+        padding:0 6px 0 10px;white-space:nowrap;
+      }
+      .seg-btn{
+        appearance:none;border:0;cursor:pointer;
+        font:inherit;font-size:15px;font-weight:500;letter-spacing:.08em;
+        color:var(--ink-dim);
+        background:transparent;
+        padding:10px 18px;border-radius:999px;
+        white-space:nowrap;line-height:1;
+        transition:background .22s ease,color .22s ease,box-shadow .22s ease;
+      }
+      .seg-btn:hover{background:var(--btn-hover);color:var(--ink)}
+      .seg-btn:focus-visible{outline:2px solid rgba(245,201,107,.75);outline-offset:2px}
+      .seg-btn[aria-pressed="true"]{
+        background:linear-gradient(180deg,#ffd98c,#edb84e);
+        color:var(--gold-ink);
+        font-weight:700;
+        box-shadow:0 2px 14px rgba(245,201,107,.35), inset 0 1px 0 rgba(255,255,255,.55);
+      }
+
+      /* ---------- 启动屏 ---------- */
+      #startScreen{
+        position:fixed;inset:0;z-index:20;
+        display:flex;align-items:center;justify-content:center;
+        padding:20px;
+        background:rgba(2,3,10,.6);
+        backdrop-filter:blur(6px);
+        -webkit-backdrop-filter:blur(6px);
+      }
+      #startScreen.hidden{display:none}
+      .start-card{
+        width:100%;max-width:430px;
+        background:rgba(9,12,30,.92);
+        border:1px solid rgba(180,190,255,.2);
+        border-radius:22px;
+        padding:30px 28px 26px;
+        box-shadow:0 24px 70px rgba(0,0,0,.6);
+        text-align:center;
+      }
+      .start-card h2{
+        margin:0;font-size:24px;font-weight:700;letter-spacing:.3em;text-indent:.3em;color:#fff;
+      }
+      .start-card .sub{
+        margin:10px 0 0;font-size:13.5px;line-height:1.7;color:var(--ink-dim);
+      }
+      .gesture-list{
+        margin:20px auto 4px;text-align:left;max-width:320px;
+        display:flex;flex-direction:column;gap:9px;
+      }
+      .gesture-list .row{display:flex;align-items:baseline;gap:10px;font-size:13.5px;line-height:1.55;color:var(--ink-dim)}
+      .gesture-list .dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;position:relative;top:-1px}
+      .gesture-list b{color:#fff;font-weight:700;white-space:nowrap}
+      #btnCam{
+        margin-top:22px;width:100%;
+        appearance:none;border:0;cursor:pointer;
+        font:inherit;font-size:18px;font-weight:700;letter-spacing:.14em;
+        color:var(--gold-ink);
+        background:linear-gradient(180deg,#ffd98c,#edb84e);
+        border-radius:999px;padding:16px 20px;
+        box-shadow:0 6px 26px rgba(245,201,107,.35), inset 0 1px 0 rgba(255,255,255,.55);
+      }
+      #btnCam:active{transform:scale(.985)}
+      #btnCam:focus-visible{outline:2px solid rgba(245,201,107,.85);outline-offset:3px}
+      #btnCam[disabled]{opacity:.6;cursor:wait}
+      #btnSim{
+        margin-top:12px;width:100%;
+        appearance:none;cursor:pointer;
+        font:inherit;font-size:14px;font-weight:600;letter-spacing:.08em;
+        color:var(--ink);
+        background:rgba(255,255,255,.07);
+        border:1px solid rgba(190,200,255,.25);
+        border-radius:999px;padding:12px 20px;
+      }
+      #btnSim:focus-visible{outline:2px solid rgba(160,170,255,.8);outline-offset:3px}
+      .privacy{
+        margin:18px 0 0;font-size:12px;line-height:1.7;color:var(--ink-faint);
+      }
+      #startError{
+        display:none;
+        margin:14px 0 0;font-size:12.5px;line-height:1.6;color:#ffb4b4;
+      }
+      #startError.show{display:block}
+
+      @media (max-width:560px){
+        header{padding-top:calc(env(safe-area-inset-top, 0px) + 12px)}
+        header h1{font-size:19px}
+        header p{font-size:12px;max-width:330px}
+        .cam-preview{width:72px;height:72px}
+        .status-chip{max-width:168px;padding:6px 11px 7px}
+        .status-chip .gesture{font-size:15px}
+        .controls{bottom:calc(env(safe-area-inset-bottom, 0px) + 12px)}
+        .seg-btn{font-size:14px;padding:10px 14px}
+        .panel .label{display:none}
+        .start-card{padding:24px 20px 20px}
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene" aria-label="手势粒子画布：用摄像头手势或手指鼠标控制发光粒子图形"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <header>
+      <h1>手势粒子</h1>
+      <p id="hint">握拳粒子聚合，张开发散成星云，转动手腕可旋转，捏合爆散换色</p>
+      <div><span id="notice" role="status"></span></div>
+    </header>
+
+    <div class="cam-stack">
+      <div class="cam-preview" id="camPreview"><video id="cam" playsinline muted autoplay></video></div>
+      <div class="status-chip">
+        <div class="gesture" id="statusText">未检测到手</div>
+        <div class="mode-line" id="modeLine">等待启动</div>
+        <div class="diag-line" id="diagLine">自检：识别模型未启动</div>
+        <button id="btnCamRetry" type="button">开启摄像头</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="panel" role="group" aria-label="粒子图形">
+        <span class="label">图形</span>
+        <button class="seg-btn" type="button" data-shape="heart" aria-pressed="true">爱心</button>
+        <button class="seg-btn" type="button" data-shape="sphere" aria-pressed="false">球体</button>
+        <button class="seg-btn" type="button" data-shape="saturn" aria-pressed="false">土星环</button>
+        <button class="seg-btn" type="button" data-shape="flower" aria-pressed="false">花朵</button>
+      </div>
+    </div>
+
+    <div id="startScreen">
+      <div class="start-card">
+        <h2>手势粒子</h2>
+        <p class="sub">打开摄像头，对着镜头做手势——<br />几千颗柔光粒子会跟着你的手聚合、成形、发散、旋转。</p>
+        <div class="gesture-list">
+          <div class="row"><span class="dot" style="background:#8ea6ff"></span><span><b>握拳</b>　粒子向中心聚合，收成发光核心</span></div>
+          <div class="row"><span class="dot" style="background:#f5c96b"></span><span><b>半开手掌</b>　粒子展开成完整图形，最清晰</span></div>
+          <div class="row"><span class="dot" style="background:#ff9ecf"></span><span><b>完全张开</b>　粒子向外发散，化作漂移的星云</span></div>
+          <div class="row"><span class="dot" style="background:#c9a2ff"></span><span><b>拧手腕 / 横移手</b>　粒子团跟着旋转</span></div>
+          <div class="row"><span class="dot" style="background:#7fe3d0"></span><span><b>拇指捏合食指</b>　爆散一次并切换颜色</span></div>
+        </div>
+        <p class="privacy" style="margin-top:16px;color:rgba(255,217,140,.88)">本次更新：粒子改用柔光渲染——每颗都带柔和光晕，大小、亮度、深浅各有层次，聚合时核心炽亮，发散时化作光尘。</p>
+        <button id="btnCam" type="button">开启摄像头</button>
+        <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
+        <p id="startError"></p>
+        <p class="privacy">隐私说明：摄像头画面只在你自己的设备上处理，用来识别手势，<b style="color:#cfd6ff">绝不会上传</b>到任何服务器。</p>
+      </div>
+    </div>
+
+    <script src="assets/mediapipe/hands.js"></script>
+    <script>
+    (function(){
+      'use strict';
+
+      var canvas = document.getElementById('scene');
+      var ctx = canvas.getContext('2d');
+      var hintEl = document.getElementById('hint');
+      var noticeEl = document.getElementById('notice');
+      var statusEl = document.getElementById('statusText');
+      var modeLineEl = document.getElementById('modeLine');
+      var diagEl = document.getElementById('diagLine');
+      var startScreen = document.getElementById('startScreen');
+      var startErrorEl = document.getElementById('startError');
+      var btnCam = document.getElementById('btnCam');
+      var btnSim = document.getElementById('btnSim');
+      var btnCamRetry = document.getElementById('btnCamRetry');
+      var camPreview = document.getElementById('camPreview');
+      var camVideo = document.getElementById('cam');
+
+      var W = 0, H = 0, DPR = 1;
+      var isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      var isSmallScreen = Math.min(window.screen.width || 9999, window.screen.height || 9999) < 820;
+      var isMobile = isCoarse || isSmallScreen;
+
+      var noticeTimer = null;
+      function showNotice(msg, ms){
+        noticeEl.textContent = msg;
+        noticeEl.classList.add('show');
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(function(){ noticeEl.classList.remove('show'); }, ms || 5200);
+      }
+
+      /* ================= 柔光精灵（全部离屏预渲染并缓存，逐帧只 drawImage） ================= */
+      var spriteCache = {};
+      function getSprite(hue){
+        var key = Math.round(hue / 6) * 6;
+        var sp = spriteCache[key];
+        if (sp) return sp;
+        sp = document.createElement('canvas');
+        sp.width = 96; sp.height = 96;
+        var sctx = sp.getContext('2d');
+        // 炽亮核心 → 柔和光晕 → 完全透明，三段衰减，无硬边
+        var g = sctx.createRadialGradient(48, 48, 0, 48, 48, 48);
+        g.addColorStop(0, 'hsla(' + key + ',100%,97%,0.95)');
+        g.addColorStop(0.16, 'hsla(' + key + ',99%,84%,0.72)');
+        g.addColorStop(0.38, 'hsla(' + key + ',95%,66%,0.30)');
+        g.addColorStop(0.7, 'hsla(' + key + ',92%,58%,0.08)');
+        g.addColorStop(1, 'hsla(' + key + ',90%,55%,0)');
+        sctx.fillStyle = g;
+        sctx.fillRect(0, 0, 96, 96);
+        // 中心一颗近乎纯白的实心小核，让密集处叠加出真正的亮芯
+        sctx.beginPath();
+        sctx.arc(48, 48, 5, 0, 6.2832);
+        sctx.fillStyle = 'hsla(' + key + ',100%,98%,0.9)';
+        sctx.fill();
+        spriteCache[key] = sp;
+        return sp;
+      }
+      // 「主星」精灵：更宽的光晕 + 十字星芒
+      var starCache = {};
+      function getStarSprite(hue){
+        var key = Math.round(hue / 6) * 6;
+        var sp = starCache[key];
+        if (sp) return sp;
+        sp = document.createElement('canvas');
+        sp.width = 128; sp.height = 128;
+        var sctx = sp.getContext('2d');
+        var g = sctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        g.addColorStop(0, 'hsla(' + key + ',100%,96%,0.95)');
+        g.addColorStop(0.16, 'hsla(' + key + ',98%,80%,0.55)');
+        g.addColorStop(0.45, 'hsla(' + key + ',92%,62%,0.16)');
+        g.addColorStop(1, 'hsla(' + key + ',90%,55%,0)');
+        sctx.fillStyle = g;
+        sctx.fillRect(0, 0, 128, 128);
+        sctx.globalCompositeOperation = 'lighter';
+        var hg = sctx.createLinearGradient(0, 0, 128, 0);
+        hg.addColorStop(0, 'hsla(' + key + ',100%,85%,0)');
+        hg.addColorStop(0.5, 'hsla(' + key + ',100%,92%,0.8)');
+        hg.addColorStop(1, 'hsla(' + key + ',100%,85%,0)');
+        sctx.fillStyle = hg;
+        sctx.fillRect(0, 61.5, 128, 5);
+        var vg = sctx.createLinearGradient(0, 0, 0, 128);
+        vg.addColorStop(0, 'hsla(' + key + ',100%,85%,0)');
+        vg.addColorStop(0.5, 'hsla(' + key + ',100%,92%,0.8)');
+        vg.addColorStop(1, 'hsla(' + key + ',100%,85%,0)');
+        sctx.fillStyle = vg;
+        sctx.fillRect(61.5, 0, 5, 128);
+        starCache[key] = sp;
+        return sp;
+      }
+      // 大面积光晕精灵（中心辉光 / 爆散闪光共用，替代逐帧 createRadialGradient）
+      var glowCache = {};
+      function getGlowSprite(kind){
+        var sp = glowCache[kind];
+        if (sp) return sp;
+        var col = kind === 'blue' ? '170,195,255' : (kind === 'flash' ? '255,240,200' : '245,201,107');
+        sp = document.createElement('canvas');
+        sp.width = 256; sp.height = 256;
+        var gctx = sp.getContext('2d');
+        var gg = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        gg.addColorStop(0, 'rgba(' + col + ',0.55)');
+        gg.addColorStop(0.4, 'rgba(' + col + ',0.20)');
+        gg.addColorStop(1, 'rgba(' + col + ',0)');
+        gctx.fillStyle = gg;
+        gctx.fillRect(0, 0, 256, 256);
+        glowCache[kind] = sp;
+        return sp;
+      }
+
+      /* ================= 颜色主题（捏合时切换） ================= */
+      var THEMES = [
+        { name: '金蓝星尘', hues: [43, 218, 268, 192], w: [0.30, 0.30, 0.24, 0.16] },
+        { name: '熔金落日', hues: [43, 28, 55, 14],  w: [0.38, 0.26, 0.22, 0.14] },
+        { name: '冰蓝极光', hues: [205, 190, 225, 168], w: [0.34, 0.26, 0.22, 0.18] },
+        { name: '紫夜星云', hues: [268, 288, 322, 240], w: [0.36, 0.26, 0.20, 0.18] }
+      ];
+      var themeIdx = 0;
+      function pickThemeHue(){
+        var th = THEMES[themeIdx];
+        var r = Math.random(), acc = 0;
+        for (var i = 0; i < th.hues.length; i++){
+          acc += th.w[i];
+          if (r <= acc) return th.hues[i] + (Math.random() * 22 - 11);
+        }
+        return th.hues[0];
+      }
+
+      /* ================= 粒子与图形 ================= */
+      var MAX_POOL = isMobile ? 6000 : 7000;
+      var BASE_COUNT = isMobile ? 3800 : 5400;
+      var targetCount = BASE_COUNT;
+      var activeCount = 0;
+      var autoScale = 1;
+
+      // 每颗粒子的基础形状坐标（单位空间，半径约 1），换图形时重算
+      var baseX = new Float32Array(MAX_POOL);
+      var baseY = new Float32Array(MAX_POOL);
+      var baseZ = new Float32Array(MAX_POOL);
+      var spread = new Float32Array(MAX_POOL);   // 绽放时外扩的个体差异
+      var pSize = new Float32Array(MAX_POOL);
+      var pHue = new Float32Array(MAX_POOL);
+      var pPhase = new Float32Array(MAX_POOL);
+      var pTw = new Float32Array(MAX_POOL);
+      // 屏幕空间位置/速度（弹簧）
+      var px = new Float32Array(MAX_POOL);
+      var py = new Float32Array(MAX_POOL);
+      var vx = new Float32Array(MAX_POOL);
+      var vy = new Float32Array(MAX_POOL);
+      var pDepth = new Float32Array(MAX_POOL);   // 投影后的深度系数（大小/亮度）
+      var pHero = new Uint8Array(MAX_POOL);      // 少数「主星」：更大更亮、带十字星芒
+      var pBright = new Float32Array(MAX_POOL);  // 每颗粒子的个体亮度系数
+      var scatX = new Float32Array(MAX_POOL);    // 发散时每颗粒子的随机散开方向（3D）
+      var scatY = new Float32Array(MAX_POOL);
+      var scatZ = new Float32Array(MAX_POOL);
+
+      var shapeName = 'heart';
+      var rotMode = 'y'; // 'y' 立体旋转 / 'z' 平面旋转（花朵）
+
+      function genShape(name){
+        var i, a, b, r, x, y, z;
+        if (name === 'heart'){
+          rotMode = 'y';
+          for (i = 0; i < MAX_POOL; i++){
+            var t = Math.random() * Math.PI * 2;
+            // 经典爱心曲线
+            var ox = 16 * Math.pow(Math.sin(t), 3);
+            var oy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            var k = Math.pow(Math.random(), 0.6);       // 向中心填充
+            x = ox * k / 17;
+            y = -oy * k / 17 - 0.13;                    // 翻到屏幕方向：尖朝下、双瓣朝上，并居中
+            z = (Math.random() * 2 - 1) * 0.34 * Math.sqrt(Math.max(0, 1 - k * k)) + (Math.random() - 0.5) * 0.03;
+            baseX[i] = x; baseY[i] = y; baseZ[i] = z;
+          }
+        } else if (name === 'sphere'){
+          rotMode = 'y';
+          for (i = 0; i < MAX_POOL; i++){
+            a = Math.random() * Math.PI * 2;
+            b = Math.acos(2 * Math.random() - 1);
+            r = 0.92 * (0.35 + 0.65 * Math.cbrt(Math.random()));
+            baseX[i] = r * Math.sin(b) * Math.cos(a);
+            baseY[i] = r * Math.cos(b);
+            baseZ[i] = r * Math.sin(b) * Math.sin(a);
+          }
+        } else if (name === 'saturn'){
+          rotMode = 'y';
+          for (i = 0; i < MAX_POOL; i++){
+            if (Math.random() < 0.36){ // 核心球
+              a = Math.random() * Math.PI * 2;
+              b = Math.acos(2 * Math.random() - 1);
+              r = 0.5 * (0.4 + 0.6 * Math.cbrt(Math.random()));
+              baseX[i] = r * Math.sin(b) * Math.cos(a);
+              baseY[i] = r * Math.cos(b);
+              baseZ[i] = r * Math.sin(b) * Math.sin(a);
+            } else { // 光环（收窄成明确的环带）
+              a = Math.random() * Math.PI * 2;
+              r = 0.85 + Math.pow(Math.random(), 1.2) * 0.39;
+              baseX[i] = r * Math.cos(a);
+              baseY[i] = (Math.random() - 0.5) * 0.035;
+              baseZ[i] = r * Math.sin(a);
+            }
+          }
+        } else { // flower 玫瑰曲线
+          rotMode = 'z';
+          for (i = 0; i < MAX_POOL; i++){
+            a = Math.random() * Math.PI * 2;
+            var rr = Math.cos(3 * a); // 三瓣玫瑰线，可正可负（自动成瓣）
+            var fill = 0.25 + 0.75 * Math.random();
+            x = rr * Math.cos(a) * fill;
+            y = rr * Math.sin(a) * fill;
+            z = 0.20 * Math.sin(3 * a) * fill + (Math.random() - 0.5) * 0.05;
+            baseX[i] = x; baseY[i] = y; baseZ[i] = z;
+          }
+        }
+        for (i = 0; i < MAX_POOL; i++){
+          spread[i] = Math.pow(Math.random(), 1.3);
+          if (px[i] === 0 && py[i] === 0){ px[i] = W / 2; py[i] = H / 2; }
+        }
+      }
+      function applyTheme(){
+        for (var i = 0; i < MAX_POOL; i++) pHue[i] = pickThemeHue();
+      }
+      function initParticles(){
+        for (var i = 0; i < MAX_POOL; i++){
+          // 大小三档分布：多数小尘、适量中粒、少数大粒，另有极少数「主星」
+          var tierR = Math.random();
+          pSize[i] = tierR < 0.62 ? 0.35 + Math.random() * 0.55
+                   : tierR < 0.93 ? 0.9 + Math.random() * 0.65
+                   : 1.55 + Math.random() * 0.85;
+          pHero[i] = Math.random() < 0.045 ? 1 : 0;
+          pBright[i] = 0.7 + Math.random() * 0.55;
+          pPhase[i] = Math.random() * Math.PI * 2;
+          pTw[i] = 0.5 + Math.random() * 1.5;
+          pDepth[i] = 1;
+          px[i] = 0; py[i] = 0;
+          // 发散方向：单位球面上的随机点，长度带个体差异
+          var sa = Math.random() * Math.PI * 2;
+          var sb = Math.acos(2 * Math.random() - 1);
+          var sr = 0.55 + Math.random() * 0.75;
+          scatX[i] = sr * Math.sin(sb) * Math.cos(sa);
+          scatY[i] = sr * Math.cos(sb);
+          scatZ[i] = sr * Math.sin(sb) * Math.sin(sa);
+        }
+        applyTheme();
+        genShape(shapeName);
+      }
+
+      var bursts = [];
+      var flashes = [];
+      var meteors = [];
+      var nextMeteor = 4000 + Math.random() * 5000;
+
+      function burstFX(cx, cy, power){
+        flashes.push({ x: cx, y: cy, alpha: 0.9 });
+        bursts.push({ x: cx, y: cy, r: 8, alpha: 0.95 });
+        var R = 300;
+        for (var i = 0; i < activeCount; i++){
+          var dx = px[i] - cx, dy = py[i] - cy;
+          var d2 = dx * dx + dy * dy;
+          if (d2 < R * R && d2 > 0.01){
+            var d = Math.sqrt(d2);
+            var f = (1 - d / R) * power;
+            vx[i] += (dx / d) * f + (Math.random() - 0.5) * 2;
+            vy[i] += (dy / d) * f + (Math.random() - 0.5) * 2;
+          }
+        }
+      }
+      function cycleThemeWithBurst(){
+        themeIdx = (themeIdx + 1) % THEMES.length;
+        applyTheme();
+        burstFX(anim.cx, anim.cy, 11);
+        showNotice('已切换颜色主题：' + THEMES[themeIdx].name, 2600);
+      }
+
+      /* ================= 动画状态（手势平滑后的值） ================= */
+      var anim = {
+        cx: 0, cy: 0,          // 图形中心（屏幕坐标，平滑跟随）
+        open: 0.55             // 张合度 0=握拳聚合 1=完全张开发散（平滑）
+      };
+      // 原始目标（由摄像头手势或模拟输入写入）
+      var target = {
+        cx: 0, cy: 0,
+        open: 0.55,
+        handPresent: false,
+        pinch: false,
+        rotTilt: 0             // 手腕倾斜给出的目标旋转角
+      };
+      // 用户驱动的旋转（叠加在缓慢自转之上）：tilt 跟随手腕角度，spin 由横移/拖动的速度累积
+      var rotUser = { tilt: 0, spin: 0, spinVel: 0 };
+      var inputMode = 'none'; // 'camera' | 'sim'
+      var gestureLabel = '未检测到手';
+      var lastStatusShown = '';
+
+      function setStatus(txt){
+        if (txt !== lastStatusShown){
+          lastStatusShown = txt;
+          statusEl.textContent = txt;
+        }
+      }
+      var lastDiagShown = '';
+      function setDiag(txt){
+        if (txt !== lastDiagShown){
+          lastDiagShown = txt;
+          diagEl.textContent = txt;
+        }
+      }
+      function errMsg(err){
+        var m = '';
+        if (typeof err === 'string') m = err;
+        else if (err && err.message) m = String(err.message);
+        else if (err) m = String(err);
+        m = m.replace(/\s+/g, ' ').trim();
+        if (!m) m = '未知错误';
+        return m.length > 56 ? m.slice(0, 56) + '…' : m;
+      }
+      function refreshGestureLabel(){
+        if (inputMode === 'camera' && resultsCount === 0){ gestureLabel = '引擎启动中…'; }
+        else if (inputMode === 'camera' && !target.handPresent){ gestureLabel = '未检测到手'; }
+        else if (target.pinch){ gestureLabel = '🤏 捏合'; }
+        else if (anim.open > 0.78){ gestureLabel = '✋ 张开 · 发散'; }
+        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 聚合'; }
+        else { gestureLabel = '✋ 半开 · 成形'; }
+        setStatus(gestureLabel);
+      }
+
+      /* ================= 尺寸 ================= */
+      function resize(){
+        DPR = Math.min(window.devicePixelRatio || 1, 2) * (qStage >= 2 ? 0.78 : 1);
+        if (DPR < 0.7) DPR = 0.7;
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = Math.round(W * DPR);
+        canvas.height = Math.round(H * DPR);
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        if (!anim.cx){ anim.cx = target.cx = W / 2; anim.cy = target.cy = H * 0.46; }
+        paintSky();
+      }
+      function paintSky(){
+        var g = ctx.createRadialGradient(W * 0.5, H * 0.38, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.85);
+        g.addColorStop(0, '#0d1230');
+        g.addColorStop(0.45, '#070b20');
+        g.addColorStop(1, '#02030a');
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        for (var i = 0; i < 130; i++){
+          var a = 0.12 + Math.random() * 0.4;
+          ctx.fillStyle = 'rgba(210,220,255,' + a.toFixed(3) + ')';
+          var r = Math.random() < 0.88 ? 0.6 : 1.1;
+          ctx.beginPath();
+          ctx.arc(Math.random() * W, Math.random() * H, r, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+
+      /* ================= 手势计算（MediaPipe 21 点） ================= */
+      function lmDist(a, b){
+        var dx = a.x - b.x, dy = a.y - b.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      function smooth01(x){
+        if (x < 0) x = 0; else if (x > 1) x = 1;
+        return x * x * (3 - 2 * x);
+      }
+      var pinchLatched = false;
+      var lastPinchAt = 0;
+      function processLandmarks(lm){
+        // 以 腕→中指根 的距离为手掌尺度，做归一化
+        var palmRef = lmDist(lm[0], lm[9]);
+        if (palmRef < 0.01) return;
+        // 张合度：四根指尖到腕部的平均距离 / 手掌尺度
+        var tips = [8, 12, 16, 20];
+        var sum = 0;
+        for (var i = 0; i < tips.length; i++) sum += lmDist(lm[tips[i]], lm[0]);
+        var ratio = (sum / tips.length) / palmRef;
+        // 经验范围：握拳 ≈1.0，张开 ≈1.95
+        var open = (ratio - 1.02) / 0.93;
+        if (open < 0) open = 0; else if (open > 1) open = 1;
+        target.open = open;
+
+        // 手的位置：掌心 5 个点的重心，镜像映射（自拍视角），中心略放大行程
+        var cxN = (lm[0].x + lm[5].x + lm[9].x + lm[13].x + lm[17].x) / 5;
+        var cyN = (lm[0].y + lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 5;
+        var mx = 0.5 + (0.5 - cxN) * 1.3;   // 1 - cxN 为镜像，再绕中心放大 1.3 倍
+        var my = 0.5 + (cyN - 0.5) * 1.25;
+        if (mx < 0.04) mx = 0.04; else if (mx > 0.96) mx = 0.96;
+        if (my < 0.06) my = 0.06; else if (my > 0.94) my = 0.94;
+        target.cx = mx * W;
+        target.cy = my * H;
+        target.handPresent = true;
+        lastHandAt = performance.now();
+
+        // 旋转①：手腕→中指根连线相对竖直方向的夹角——拧手腕，粒子团就跟着转
+        var tvx = lm[9].x - lm[0].x, tvy = lm[9].y - lm[0].y;
+        var tiltAng = Math.atan2(tvx, -tvy);
+        var rt = tiltAng * 2.1;
+        if (rt < -2.4) rt = -2.4; else if (rt > 2.4) rt = 2.4;
+        target.rotTilt = rt;
+        // 旋转②：手掌横向移动的速度也带动旋转（甩手的感觉）
+        if (prevHandCx !== null){
+          var hvx = target.cx - prevHandCx;
+          var add = hvx * 0.0016;
+          if (add < -0.3) add = -0.3; else if (add > 0.3) add = 0.3;
+          rotUser.spinVel += add;
+        }
+        prevHandCx = target.cx;
+
+        // 捏合：拇指尖↔食指尖距离（带迟滞防抖）
+        var pinchRatio = lmDist(lm[4], lm[8]) / palmRef;
+        if (!pinchLatched && pinchRatio < 0.34){
+          pinchLatched = true;
+          target.pinch = true;
+          var now = performance.now();
+          if (now - lastPinchAt > 650){
+            lastPinchAt = now;
+            cycleThemeWithBurst();
+          }
+        } else if (pinchLatched && pinchRatio > 0.55){
+          pinchLatched = false;
+          target.pinch = false;
+        }
+      }
+      var lastHandAt = 0;
+      var prevHandCx = null; // 上一帧手掌中心（算横向移动速度用）
+
+      /* ================= 摄像头 + MediaPipe Hands ================= */
+      var handsObj = null;
+      var camStream = null;
+      var sending = false;
+      var lastSendAt = 0;
+      var sendFailures = 0;
+      var camRunning = false;
+      var lastResultsAt = 0;     // 最近一次收到识别结果的时刻（判断引擎是否在工作）
+      var firstResultsAt = 0;    // 本轮引擎第一次返回结果的时刻（无手提示的计时基准）
+      var resultsCount = 0;      // 本轮引擎累计返回的结果数（0 = 引擎还没跑起来）
+      var engineStartedAt = 0;   // 本轮引擎创建时间（看门狗计时基准）
+      var engineRebuilt = false; // 引擎是否已自动重启过一次
+      var engineReady = false;   // initialize() 是否已成功（模型/WASM 真正就绪后才发帧）
+      var noHandTipShown = false; // 「没看到手」操作提示本轮是否已弹过
+
+      function createHands(){
+        if (handsObj){
+          try { handsObj.close(); } catch (e) {}
+          handsObj = null;
+        }
+        sending = false;
+        var h = new window.Hands({
+          locateFile: function(f){ return 'assets/mediapipe/' + f; }
+        });
+        h.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          // 注意：不要开 selfieMode——processLandmarks 已手动做镜像映射，两边叠加会让左右跟随反向
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.4
+        });
+        h.onResults(function(res){
+          resultsCount++;
+          lastResultsAt = performance.now();
+          if (resultsCount === 1){
+            firstResultsAt = lastResultsAt;
+            modeLineEl.textContent = '摄像头模式 · 画面只在本机处理';
+            setDiag('自检：模型就绪，识别运行中');
+          }
+          if (res && res.multiHandLandmarks && res.multiHandLandmarks.length){
+            noHandTipShown = false;
+            processLandmarks(res.multiHandLandmarks[0]);
+          }
+        });
+        handsObj = h;
+        engineStartedAt = performance.now();
+        lastResultsAt = 0;
+        firstResultsAt = 0;
+        resultsCount = 0;
+        engineReady = false;
+        modeLineEl.textContent = '识别引擎加载中，稍等几秒…';
+        setDiag('自检：识别模型加载中…');
+        // 显式等模型与 WASM 真正就绪：initialize 成功前帧泵不发帧；
+        // 失败把真实错误写到自检行，并走自动重启一次的恢复路径
+        h.initialize().then(function(){
+          if (h !== handsObj) return;
+          engineReady = true;
+          setDiag('自检：模型就绪，识别运行中');
+          modeLineEl.textContent = '摄像头模式 · 画面只在本机处理';
+        }).catch(function(err){
+          if (h !== handsObj) return;
+          setDiag('自检：识别出错：' + errMsg(err));
+          if (window.console && console.warn) console.warn('[手势识别] 模型初始化失败', err);
+          engineStalled();
+        });
+      }
+
+      function enterSimMode(reason){
+        inputMode = 'sim';
+        camRunning = false;
+        if (camStream){
+          camStream.getTracks().forEach(function(t){ t.stop(); });
+          camStream = null;
+        }
+        camPreview.classList.remove('on');
+        startScreen.classList.add('hidden');
+        btnCamRetry.classList.add('show');
+        modeLineEl.textContent = '模拟模式 · 指针是手的位置';
+        setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
+        hintEl.textContent = '模拟模式：按住 = 握拳聚合，松开放开 = 成形，滚轮推满 = 发散，横向拖动 = 旋转，双击 = 爆散换色';
+        target.handPresent = true;
+        target.cx = anim.cx; target.cy = anim.cy;
+        target.open = simOpen;
+        if (reason) showNotice(reason + '，已切换到模拟模式', 6500);
+        refreshGestureLabel();
+      }
+
+      function startCamera(){
+        btnCam.disabled = true;
+        btnCam.textContent = '正在打开摄像头…';
+        startErrorEl.classList.remove('show');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+          btnCam.disabled = false;
+          btnCam.textContent = '开启摄像头';
+          startErrorEl.textContent = '当前浏览器不支持调用摄像头，将为你切换到模拟模式。';
+          startErrorEl.classList.add('show');
+          setTimeout(function(){ enterSimMode('浏览器不支持摄像头'); }, 900);
+          return;
+        }
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        }).then(function(stream){
+          camStream = stream;
+          camVideo.srcObject = stream;
+          return camVideo.play();
+        }).then(function(){
+          if (typeof window.Hands === 'undefined'){
+            throw new Error('hands-lib-missing');
+          }
+          engineRebuilt = false;
+          sendFailures = 0;
+          createHands();
+          inputMode = 'camera';
+          camRunning = true;
+          pumpActive = false;
+          requestAnimationFrame(pumpCamera); // 相机就绪后才启动帧泵
+          camPreview.classList.add('on');
+          startScreen.classList.add('hidden');
+          btnCamRetry.classList.remove('show');
+          hintEl.textContent = '握拳粒子聚合，半开成形，完全张开发散成星云；拧手腕或横移手掌可旋转，捏合爆散换色';
+          target.handPresent = false;
+          showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
+        }).catch(function(err){
+          btnCam.disabled = false;
+          btnCam.textContent = '开启摄像头';
+          var msg = '摄像头打开失败';
+          if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) msg = '摄像头权限被拒绝';
+          else if (err && (err.name === 'NotFoundError' || err.name === 'OverconstrainedError')) msg = '没有找到可用的摄像头';
+          else if (err && err.message === 'hands-lib-missing') msg = '手势识别组件加载失败';
+          startErrorEl.textContent = msg + '，将为你切换到模拟模式。';
+          startErrorEl.classList.add('show');
+          setTimeout(function(){ enterSimMode(msg); }, 900);
+        });
+      }
+
+      var pumpActive = false;
+      function pumpCamera(){
+        if (!camRunning || !handsObj){ pumpActive = false; return; }
+        if (pumpActive) return;
+        pumpActive = true;
+        pumpStep();
+      }
+      function pumpStep(){
+        if (!camRunning || !handsObj){ pumpActive = false; return; }
+        if (!engineReady){ requestAnimationFrame(pumpStep); return; } // 模型没就绪不发帧，空转等 initialize
+        var now = performance.now();
+        if (!sending && camVideo.readyState >= 2 && camVideo.videoWidth > 0 && now - lastSendAt > 33){
+          sending = true;
+          lastSendAt = now;
+          var sendToken = now;
+          var h = handsObj;
+          var settled = false;
+          var releaseSend = function(){
+            // 只释放仍属于本次发送的占用，旧引擎的迟到回调不许干扰新引擎
+            if (sending && lastSendAt === sendToken) sending = false;
+          };
+          var failSend = function(err){
+            if (h !== handsObj) return;
+            if (err){
+              // 错误不许静默吞掉：写到页面自检行，用户能直接看到卡在哪
+              setDiag('自检：识别出错：' + errMsg(err));
+              if (window.console && console.warn) console.warn('[手势识别] 发送帧失败', err);
+            }
+            sendFailures++;
+            if (sendFailures >= 6 && inputMode === 'camera') engineStalled();
+          };
+          try {
+            h.send({ image: camVideo }).then(function(){
+              if (settled) return;
+              settled = true;
+              releaseSend();
+              if (h === handsObj) sendFailures = 0;
+            }).catch(function(err){
+              if (settled) return;
+              settled = true;
+              releaseSend();
+              failSend(err);
+            });
+          } catch (e) {
+            // send() 同步抛错时也不能打断帧泵循环
+            settled = true;
+            releaseSend();
+            failSend(e);
+          }
+          // 引擎已跑通后，单帧发送若 4 秒还不返回，视为卡死：释放占用并计数，
+          // 避免一帧永不返回的发送把整条管线堵死（引擎未就绪阶段由看门狗兜底）
+          if (resultsCount > 0){
+            setTimeout(function(){
+              if (settled) return;
+              settled = true;
+              releaseSend();
+              failSend('引擎超时无响应');
+            }, 4000);
+          }
+        }
+        requestAnimationFrame(pumpStep);
+      }
+
+      /* 引擎无响应时的恢复：先自动重启一次，仍无结果才明确报错并切模拟模式 */
+      function engineStalled(){
+        if (inputMode !== 'camera') return;
+        if (!engineRebuilt && typeof window.Hands !== 'undefined'){
+          engineRebuilt = true;
+          sendFailures = 0;
+          showNotice('识别引擎没有响应，正在自动重启…', 4000);
+          createHands();
+          pumpActive = false;
+          requestAnimationFrame(pumpCamera);
+        } else {
+          enterSimMode('手势识别引擎多次无响应');
+        }
+      }
+
+      /* 看门狗：区分「引擎根本没在跑」和「引擎在跑但没看到手」，分别处理 */
+      setInterval(function(){
+        if (inputMode !== 'camera' || !camRunning) return;
+        var now = performance.now();
+        if (resultsCount === 0){
+          // 引擎首次加载要下载约 16MB 的 wasm 与模型，慢网络下给足 25 秒
+          if (now - engineStartedAt > 25000) engineStalled();
+          return;
+        }
+        // 引擎在正常返回结果、但持续看不到手：给一次对准提示，而不是干等着
+        if (!target.handPresent && !noHandTipShown && now - Math.max(lastHandAt, firstResultsAt) > 6000){
+          noHandTipShown = true;
+          showNotice('没看到手？试试：手掌正对镜头、离镜头约 30–60 厘米、光线亮一点', 6000);
+        }
+      }, 1000);
+
+      btnCam.addEventListener('click', function(){
+        startCamera();
+        // 启动帧泵（重复调用无害：camRunning 为假时自动退出）
+        requestAnimationFrame(pumpCamera);
+      });
+      btnSim.addEventListener('click', function(){ enterSimMode(''); });
+      btnCamRetry.addEventListener('click', function(){
+        startScreen.classList.remove('hidden');
+        btnCam.disabled = false;
+        btnCam.textContent = '开启摄像头';
+      });
+
+      /* ================= 模拟模式输入 ================= */
+      var simOpen = 0.5; // 默认停在「成形」档，图形最清晰
+      var simHolding = false;
+      var activePointers = {};
+      var pinchDist0 = 0, simOpenAtPinch = 0.5;
+
+      function simSetPos(x, y){
+        if (inputMode !== 'sim') return;
+        target.cx = x; target.cy = y;
+        target.handPresent = true;
+      }
+      canvas.addEventListener('pointermove', function(e){
+        if (inputMode !== 'sim') return;
+        // 横向拖动（按住移动）= 旋转：横向位移累积成旋转速度
+        var prevP = activePointers[e.pointerId];
+        if (prevP && e.buttons > 0){
+          var mdx = e.clientX - prevP.x;
+          if (mdx){
+            var radd = mdx * 0.0022;
+            if (radd < -0.3) radd = -0.3; else if (radd > 0.3) radd = 0.3;
+            rotUser.spinVel += radd;
+          }
+        }
+        activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        var ids = Object.keys(activePointers);
+        if (ids.length === 2){
+          var p1 = activePointers[ids[0]], p2 = activePointers[ids[1]];
+          var d = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+          if (pinchDist0 > 0){
+            simOpen = Math.min(1, Math.max(0.05, simOpenAtPinch + (d - pinchDist0) / 260));
+            target.open = simOpen; // 双指滑动实时调张合，优先于单指握拳
+          }
+          simSetPos((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+        } else {
+          simSetPos(e.clientX, e.clientY);
+        }
+      }, { passive: true });
+      canvas.addEventListener('pointerdown', function(e){
+        if (inputMode !== 'sim') return;
+        activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+        var ids = Object.keys(activePointers);
+        if (ids.length === 2){
+          var p1 = activePointers[ids[0]], p2 = activePointers[ids[1]];
+          pinchDist0 = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+          simOpenAtPinch = simOpen;
+          simHolding = false;
+          target.open = simOpen; // 双指模式：不进握拳，滑动直接调张合
+        } else {
+          simHolding = true;
+          target.open = 0; // 单指按住 = 握拳
+        }
+        simSetPos(e.clientX, e.clientY);
+      });
+      function simRelease(e){
+        delete activePointers[e.pointerId];
+        var remain = Object.keys(activePointers).length;
+        if (remain === 0){
+          simHolding = false;
+          pinchDist0 = 0;
+          if (inputMode === 'sim') target.open = simOpen; // 松开 = 张开
+        } else if (remain === 1){
+          pinchDist0 = 0;
+          simHolding = true;
+          if (inputMode === 'sim') target.open = 0; // 剩一根手指还按着 = 握拳
+        }
+      }
+      window.addEventListener('pointerup', simRelease);
+      window.addEventListener('pointercancel', simRelease);
+      canvas.addEventListener('wheel', function(e){
+        if (inputMode !== 'sim') return;
+        e.preventDefault();
+        simOpen = Math.min(1, Math.max(0.05, simOpen - Math.sign(e.deltaY) * 0.09));
+        if (!simHolding) target.open = simOpen;
+      }, { passive: false });
+      canvas.addEventListener('dblclick', function(){
+        if (inputMode !== 'sim') return;
+        cycleThemeWithBurst();
+      });
+      canvas.addEventListener('touchmove', function(e){ e.preventDefault(); }, { passive: false });
+
+      /* ================= 图形切换按钮 ================= */
+      var shapeBtns = document.querySelectorAll('[data-shape]');
+      shapeBtns.forEach(function(btn){
+        btn.addEventListener('click', function(){
+          shapeBtns.forEach(function(b){ b.setAttribute('aria-pressed', 'false'); });
+          btn.setAttribute('aria-pressed', 'true');
+          shapeName = btn.getAttribute('data-shape');
+          genShape(shapeName);
+          burstFX(anim.cx, anim.cy, 4);
+        });
+      });
+
+      /* ================= 主循环 ================= */
+      var last = performance.now();
+      var fpsFrames = 0, fpsTime = 0;
+      var qStage = 0; // 画质自适应档：0 满质量 / 1 降拖尾 / 2 降分辨率 / 3 才降粒子数
+      var rotY = 0, rotZ = 0;
+
+      function frame(now){
+        requestAnimationFrame(frame);
+        var dtMs = now - last;
+        last = now;
+        if (dtMs > 250) dtMs = 250;
+        var dt = Math.min(dtMs / 16.667, 3);
+        var t = now * 0.001;
+
+        /* —— 摄像头模式下，手消失超时 —— */
+        if (inputMode === 'camera' && target.handPresent && now - lastHandAt > 500){
+          target.handPresent = false;
+          target.pinch = false;
+          pinchLatched = false;
+          prevHandCx = null;
+        }
+
+        /* —— 平滑跟随（防抖）：位置、张合度向目标趋近 —— */
+        var idleCx = W / 2, idleCy = H * 0.46;
+        var wantCx = target.handPresent ? target.cx : idleCx;
+        var wantCy = target.handPresent ? target.cy : idleCy;
+        var wantOpen = target.handPresent ? target.open : 0.55;
+        var posK = 1 - Math.pow(0.0001, dtMs / 1000); // 约百毫秒级平滑
+        var openK = 1 - Math.pow(0.0005, dtMs / 1000);
+        anim.cx += (wantCx - anim.cx) * Math.min(1, posK * 1.6);
+        anim.cy += (wantCy - anim.cy) * Math.min(1, posK * 1.6);
+        anim.open += (wantOpen - anim.open) * Math.min(1, openK);
+        refreshGestureLabel();
+
+        /* —— 性能自适应（分档降级：先降拖尾 → 再降分辨率 → 最后才降粒子数；帧率恢复时反向升档） —— */
+        if (!document.hidden){
+          fpsFrames++; fpsTime += dtMs;
+          if (fpsTime >= 3000){
+            var fps = fpsFrames * 1000 / fpsTime;
+            if (fps < 42){
+              if (qStage < 3){ qStage++; if (qStage === 2) resize(); }
+              else if (autoScale > 0.55) autoScale = Math.max(0.55, autoScale - 0.09);
+            } else if (fps > 57){
+              if (qStage >= 3 && autoScale < 1) autoScale = Math.min(1, autoScale + 0.05);
+              else if (qStage > 0){ qStage--; if (qStage === 1) resize(); }
+            }
+            fpsFrames = 0; fpsTime = 0;
+          }
+        }
+        activeCount = Math.min(MAX_POOL, Math.round(targetCount * autoScale));
+
+        /* —— 拖尾底色 —— */
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(3,4,12,' + (qStage >= 1 ? 0.30 : 0.16).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+
+        /* —— 图形几何：张合度连续驱动 聚合 → 成形 → 发散 ——
+           formT：0 = 紧团（图形融化、粒子压到中心）→ 1 = 成形（图形最清晰）
+           neb：  0 = 成形 → 1 = 完全发散（随机偏移 + 漂移，轮廓溶成星云） */
+        var formT = smooth01((anim.open - 0.05) / 0.45);
+        var neb = smooth01((anim.open - 0.55) / 0.45);
+        var core = 1 - formT;
+        var spreadCoef = 0.14 + 0.86 * formT + neb * 0.30;   // 基点离中心的距离系数
+        var R = Math.min(W, H) * 0.30 * (0.88 + formT * 0.12 + neb * 0.10);
+
+        /* —— 旋转：缓慢自转 + 用户驱动（手腕倾斜跟随 + 横移/拖动速度累积） —— */
+        var wantTilt = target.handPresent ? target.rotTilt : 0;
+        rotUser.tilt += (wantTilt - rotUser.tilt) * Math.min(1, openK);
+        rotUser.spin += rotUser.spinVel * dt;
+        rotUser.spinVel *= Math.pow(0.90, dt);
+        var userRot = rotUser.tilt + rotUser.spin;
+        rotY += dt * 0.14 * (rotMode === 'y' ? 1 : 0.22);
+        rotZ += dt * 0.10;
+        var totalY = rotY + (rotMode === 'y' ? userRot : 0);
+        var totalZ = rotZ + (rotMode === 'z' ? userRot : 0);
+        var tiltX = rotMode === 'y' ? (shapeName === 'saturn' ? 0.62 : 0.38) : 0.12;
+        var cosY = Math.cos(totalY), sinY = Math.sin(totalY);
+        var cosX = Math.cos(tiltX), sinX = Math.sin(tiltX);
+        var cosZ = Math.cos(totalZ), sinZ = Math.sin(totalZ);
+
+        // 中心光晕（预渲染精灵贴图）：聚合时紧实明亮，发散时摊开变淡
+        var glowR = R * (1.12 + neb * 0.9) + 24;
+        ctx.globalAlpha = Math.min(0.36, 0.10 + core * 0.22 + neb * 0.04);
+        ctx.drawImage(getGlowSprite(core > 0.45 ? 'blue' : 'gold'), anim.cx - glowR, anim.cy - glowR, glowR * 2, glowR * 2);
+        ctx.globalAlpha = 1;
+
+        ctx.globalCompositeOperation = 'lighter';
+        // 聚合时弹簧更硬（吸入感），发散时更软（漂浮感）
+        var kSpring = 0.05 + core * 0.05 - neb * 0.018, dampF = Math.pow(0.86 + neb * 0.05, dt);
+
+        for (var i = 0; i < activeCount; i++){
+          // 目标点 = 图形基点 × 散开系数 + 随机散开偏移 × 发散量 + 缓慢漂移 × 发散量
+          var indiv = 1 + neb * 0.18 * spread[i];
+          var bx = baseX[i] * spreadCoef * indiv + scatX[i] * neb * 0.9 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.055 * neb;
+          var by = baseY[i] * spreadCoef * indiv + scatY[i] * neb * 0.9 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.055 * neb;
+          var bz = baseZ[i] * spreadCoef + scatZ[i] * neb * 0.9;
+          var x1, y1, z1;
+          if (rotMode === 'y'){
+            x1 = bx * cosY + bz * sinY;
+            z1 = -bx * sinY + bz * cosY;
+            y1 = by * cosX - z1 * sinX;
+            z1 = by * sinX + z1 * cosX;
+          } else {
+            x1 = bx * cosZ - by * sinZ;
+            y1 = bx * sinZ + by * cosZ;
+            z1 = bz;
+          }
+          var persp = 6.5 / (6.5 + z1); // 弱透视：近大远小，但不把近侧粒子甩到画面外
+          var tx = anim.cx + x1 * persp * R;
+          var ty = anim.cy + y1 * persp * R;
+          pDepth[i] = persp;
+
+          // 弹簧趋近目标点
+          vx[i] = (vx[i] + (tx - px[i]) * kSpring * dt) * dampF;
+          vy[i] = (vy[i] + (ty - py[i]) * kSpring * dt) * dampF;
+          if (core > 0.02){ // 聚合时额外给一点向中心的吸入速度
+            vx[i] += (anim.cx - px[i]) * 0.0035 * core * dt;
+            vy[i] += (anim.cy - py[i]) * 0.0035 * core * dt;
+          }
+          px[i] += vx[i] * dt;
+          py[i] += vy[i] * dt;
+
+          var tw = 0.55 + 0.45 * Math.sin(t * pTw[i] * 2 + pPhase[i]);
+          var hue = pHue[i] + Math.sin(t * 0.13 + pPhase[i] * 0.7) * 12;
+          // 深度：近亮远暗，旋转时前后层次分明
+          var depthLight = 0.45 + 0.6 * persp;
+          // 聚合「炽热」：越靠近中心越亮、色温向白金靠拢；发散时外圈粒子渐暗
+          var rrCore = Math.sqrt(bx * bx + by * by + bz * bz);
+          var heat = core * Math.max(0, 1 - rrCore / 0.72);
+          if (heat > 0.01){
+            var dh = ((46 - hue + 540) % 360) - 180; // 沿最短色环方向靠向金色
+            hue += dh * heat * 0.65;
+          }
+          var edgeDim = 1 - neb * 0.38 * Math.min(1, Math.max(0, (rrCore - 0.85) / 0.9));
+          var hero = pHero[i] === 1;
+          var alpha = (0.16 + 0.34 * tw) * depthLight * pBright[i] * (0.85 + core * 0.6 - neb * 0.15) * edgeDim + heat * 0.30;
+          var alphaCap = hero ? 0.95 : 0.72;
+          if (alpha > alphaCap) alpha = alphaCap;
+          var size = pSize[i] * 6.4 * Math.pow(persp, 1.15) * (1 + core * 0.3 + neb * 0.12) * (1 + heat * 0.3) * (hero ? 2.2 : 1);
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(hero ? getStarSprite(hue) : getSprite(hue), px[i] - size / 2, py[i] - size / 2, size, size);
+        }
+        ctx.globalAlpha = 1;
+
+        /* —— 冲击波 + 闪光 —— */
+        for (var b = bursts.length - 1; b >= 0; b--){
+          var bu = bursts[b];
+          bu.r += 7.5 * dt;
+          bu.alpha *= Math.pow(0.90, dt);
+          if (bu.alpha < 0.02 || bu.r > 460){ bursts.splice(b, 1); continue; }
+          ctx.strokeStyle = 'rgba(255,226,160,' + bu.alpha.toFixed(3) + ')';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r, 0, 6.2832); ctx.stroke();
+          ctx.strokeStyle = 'rgba(170,185,255,' + (bu.alpha * 0.55).toFixed(3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r * 0.78, 0, 6.2832); ctx.stroke();
+        }
+        for (var f = flashes.length - 1; f >= 0; f--){
+          var fl = flashes[f];
+          fl.alpha *= Math.pow(0.82, dt);
+          if (fl.alpha < 0.02){ flashes.splice(f, 1); continue; }
+          ctx.globalAlpha = Math.min(1, fl.alpha * 0.85);
+          ctx.drawImage(getGlowSprite('flash'), fl.x - 130, fl.y - 130, 260, 260);
+          ctx.globalAlpha = 1;
+        }
+
+        /* —— 流星 —— */
+        nextMeteor -= dtMs;
+        if (nextMeteor <= 0){
+          nextMeteor = 6000 + Math.random() * 8000;
+          var mx = W * (0.25 + Math.random() * 0.7), my = H * Math.random() * 0.3;
+          meteors.push({ x: mx, y: my, vx: -(4.5 + Math.random() * 2.5), vy: 2.4 + Math.random() * 1.4, life: 0, maxLife: 46 + Math.random() * 20 });
+        }
+        for (var m = meteors.length - 1; m >= 0; m--){
+          var me = meteors[m];
+          me.life += dt;
+          me.x += me.vx * dt; me.y += me.vy * dt;
+          if (me.life > me.maxLife){ meteors.splice(m, 1); continue; }
+          var fade = Math.sin(Math.PI * (me.life / me.maxLife));
+          var grad = ctx.createLinearGradient(me.x, me.y, me.x - me.vx * 13, me.y - me.vy * 13);
+          grad.addColorStop(0, 'rgba(255,244,214,' + (0.85 * fade).toFixed(3) + ')');
+          grad.addColorStop(1, 'rgba(255,244,214,0)');
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(me.x, me.y);
+          ctx.lineTo(me.x - me.vx * 13, me.y - me.vy * 13);
+          ctx.stroke();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      var resizeTimer = null;
+      window.addEventListener('resize', function(){
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(resize, 120);
+      });
+      window.addEventListener('orientationchange', function(){
+        setTimeout(resize, 200);
+      });
+
+      resize();
+      initParticles();
+      requestAnimationFrame(frame);
+    })();
+    </script>
+  </body>
+</html>
