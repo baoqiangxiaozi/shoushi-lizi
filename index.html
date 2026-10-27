@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="data:," />
-    <title>手势粒子</title>
+    <title>粒子土星</title>
     <style>
       :root{
         color-scheme: dark;
@@ -42,68 +42,50 @@
         background:radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(1,2,8,.55) 100%);
       }
 
-      /* ---------- 顶部标题 ---------- */
+      /* ---------- 左上角小标题 ---------- */
       header{
         position:fixed;z-index:5;
-        top:0;left:0;right:0;
-        text-align:center;
+        top:0;left:0;
+        text-align:left;
         pointer-events:none;
-        padding:calc(env(safe-area-inset-top, 0px) + 16px) 20px 30px;
-        background:linear-gradient(180deg, rgba(2,3,10,.66) 0%, rgba(2,3,10,.38) 55%, rgba(2,3,10,0) 100%);
+        padding:calc(env(safe-area-inset-top, 0px) + 13px) 16px 0;
       }
       header h1{
         margin:0;
-        font-size:clamp(20px,3.2vw,28px);
-        font-weight:600;
-        letter-spacing:.42em;
-        text-indent:.42em;
-        color:var(--ink);
-        text-shadow:0 0 18px rgba(160,170,255,.5), 0 0 46px rgba(245,201,107,.25), 0 2px 12px rgba(0,0,0,.9);
+        font-size:12.5px;
+        font-weight:500;
+        letter-spacing:.22em;
+        color:rgba(206,196,255,.62);
+        text-shadow:0 1px 6px rgba(0,0,0,.8);
       }
-      header p{
-        display:inline-block;
-        margin:10px auto 0;
-        max-width:560px;
-        font-size:13.5px;
-        font-weight:600;
-        line-height:1.7;
-        letter-spacing:.05em;
-        color:#ffffff;
-        background:rgba(2,3,12,.82);
-        border:1px solid rgba(190,200,255,.14);
-        border-radius:999px;
-        padding:4px 16px;
-        text-shadow:0 1px 4px rgba(0,0,0,.6);
-        transition:opacity 1.2s ease;
-      }
-      header p.faded{opacity:.55}
+      header p{display:none}
       #notice{
         display:none;
-        margin:8px auto 0;
-        max-width:520px;
-        font-size:12.5px;font-weight:600;line-height:1.6;
-        color:#ffe1a8;
-        background:rgba(46,32,4,.85);
-        border:1px solid rgba(245,201,107,.35);
-        border-radius:10px;
-        padding:5px 14px;
+        margin:7px 0 0;
+        max-width:78vw;
+        font-size:11px;font-weight:500;line-height:1.55;
+        color:rgba(226,214,255,.92);
+        background:rgba(24,16,52,.78);
+        border:1px solid rgba(168,140,255,.28);
+        border-radius:8px;
+        padding:4px 10px;
       }
       #notice.show{display:inline-block}
 
-      /* ---------- 左上角：摄像头圆窗预览 + 状态 ---------- */
+      /* ---------- 右上角：摄像头小圆窗 ---------- */
       .cam-stack{
         position:fixed;z-index:6;
-        top:calc(env(safe-area-inset-top, 0px) + 14px);
-        left:14px;
-        display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+        top:calc(env(safe-area-inset-top, 0px) + 12px);
+        right:12px;
         pointer-events:none;
       }
       .cam-preview{
-        width:88px;height:88px;border-radius:50%;
+        width:62px;height:62px;border-radius:50%;
         overflow:hidden;
-        border:2px solid rgba(200,210,255,.35);
-        box-shadow:0 8px 26px rgba(0,0,0,.55), 0 0 0 4px rgba(6,8,22,.45);
+        border:1.5px solid rgba(190,170,255,.3);
+        box-shadow:0 6px 20px rgba(0,0,0,.5);
         background:#0a0e24;
+        opacity:.85;
         display:none;
       }
       .cam-preview.on{display:block}
@@ -112,80 +94,32 @@
         transform:scaleX(-1); /* 镜像，像照镜子 */
         display:block;
       }
-      .status-chip{
-        pointer-events:auto;
-        background:rgba(2,3,12,.82);
-        border:1px solid rgba(190,200,255,.16);
-        border-radius:14px;
-        padding:7px 13px 8px;
-        max-width:200px;
-        backdrop-filter:blur(8px);
-        -webkit-backdrop-filter:blur(8px);
+      /* ---------- 左下角：极小状态行（手势 + 自检合并一行） ---------- */
+      .status-bar{
+        position:fixed;z-index:6;
+        left:14px;
+        bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
+        display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+        max-width:calc(100vw - 28px);
+        pointer-events:none;
+        font-size:10.5px;letter-spacing:.04em;line-height:1.5;
+        color:rgba(198,188,240,.5);
+        text-shadow:0 1px 5px rgba(0,0,0,.9);
       }
-      .status-chip .gesture{
-        font-size:16.5px;font-weight:700;letter-spacing:.06em;color:#fff;line-height:1.35;
-      }
-      .status-chip .mode-line{
-        margin-top:2px;
-        font-size:11px;letter-spacing:.1em;color:var(--ink-faint);line-height:1.5;
-      }
-      .status-chip .diag-line{
-        margin-top:3px;
-        font-size:10.5px;letter-spacing:.03em;line-height:1.55;
-        color:rgba(255,217,140,.92);
-        word-break:break-all;
-      }
+      .status-bar .gesture{white-space:nowrap}
+      .status-bar .mode-line{display:none}
+      .status-bar .diag-line{color:rgba(198,188,240,.42);word-break:break-all}
       #btnCamRetry{
         display:none;
-        margin-top:6px;
+        pointer-events:auto;
         appearance:none;cursor:pointer;
-        font:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;
-        color:var(--gold-ink);
-        background:linear-gradient(180deg,#ffd98c,#edb84e);
-        border:0;border-radius:999px;padding:6px 14px;
+        font:inherit;font-size:11px;font-weight:600;letter-spacing:.05em;
+        color:#241a4d;
+        background:linear-gradient(180deg,#cdb9ff,#9d7ff2);
+        border:0;border-radius:999px;padding:5px 12px;
       }
       #btnCamRetry.show{display:inline-block}
-      #btnCamRetry:focus-visible{outline:2px solid rgba(245,201,107,.8);outline-offset:2px}
-
-      /* ---------- 底部图形切换 ---------- */
-      .controls{
-        position:fixed;z-index:6;
-        left:50%;transform:translateX(-50%);
-        bottom:calc(env(safe-area-inset-bottom, 0px) + 18px);
-        display:flex;align-items:stretch;gap:10px;
-        max-width:calc(100vw - 20px);
-      }
-      .panel{
-        display:flex;align-items:center;gap:4px;
-        background:var(--panel);
-        border:1px solid var(--panel-line);
-        border-radius:999px;
-        padding:5px;
-        backdrop-filter:blur(14px) saturate(1.3);
-        -webkit-backdrop-filter:blur(14px) saturate(1.3);
-        box-shadow:0 10px 34px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-      }
-      .panel .label{
-        font-size:11px;letter-spacing:.14em;color:var(--ink-faint);
-        padding:0 6px 0 10px;white-space:nowrap;
-      }
-      .seg-btn{
-        appearance:none;border:0;cursor:pointer;
-        font:inherit;font-size:15px;font-weight:500;letter-spacing:.08em;
-        color:var(--ink-dim);
-        background:transparent;
-        padding:10px 18px;border-radius:999px;
-        white-space:nowrap;line-height:1;
-        transition:background .22s ease,color .22s ease,box-shadow .22s ease;
-      }
-      .seg-btn:hover{background:var(--btn-hover);color:var(--ink)}
-      .seg-btn:focus-visible{outline:2px solid rgba(245,201,107,.75);outline-offset:2px}
-      .seg-btn[aria-pressed="true"]{
-        background:linear-gradient(180deg,#ffd98c,#edb84e);
-        color:var(--gold-ink);
-        font-weight:700;
-        box-shadow:0 2px 14px rgba(245,201,107,.35), inset 0 1px 0 rgba(255,255,255,.55);
-      }
+      #btnCamRetry:focus-visible{outline:2px solid rgba(190,160,255,.8);outline-offset:2px}
 
       /* ---------- 启动屏 ---------- */
       #startScreen{
@@ -223,10 +157,10 @@
         margin-top:22px;width:100%;
         appearance:none;border:0;cursor:pointer;
         font:inherit;font-size:18px;font-weight:700;letter-spacing:.14em;
-        color:var(--gold-ink);
-        background:linear-gradient(180deg,#ffd98c,#edb84e);
+        color:#f4efff;
+        background:linear-gradient(180deg,#9d7ff2,#6d4bd8);
         border-radius:999px;padding:16px 20px;
-        box-shadow:0 6px 26px rgba(245,201,107,.35), inset 0 1px 0 rgba(255,255,255,.55);
+        box-shadow:0 6px 26px rgba(139,111,240,.4), inset 0 1px 0 rgba(255,255,255,.35);
       }
       #btnCam:active{transform:scale(.985)}
       #btnCam:focus-visible{outline:2px solid rgba(245,201,107,.85);outline-offset:3px}
@@ -251,61 +185,44 @@
       #startError.show{display:block}
 
       @media (max-width:560px){
-        header{padding-top:calc(env(safe-area-inset-top, 0px) + 12px)}
-        header h1{font-size:19px}
-        header p{font-size:12px;max-width:330px}
-        .cam-preview{width:72px;height:72px}
-        .status-chip{max-width:168px;padding:6px 11px 7px}
-        .status-chip .gesture{font-size:15px}
-        .controls{bottom:calc(env(safe-area-inset-bottom, 0px) + 12px)}
-        .seg-btn{font-size:14px;padding:10px 14px}
-        .panel .label{display:none}
+        header{padding-top:calc(env(safe-area-inset-top, 0px) + 11px)}
+        .cam-preview{width:54px;height:54px}
         .start-card{padding:24px 20px 20px}
       }
     </style>
   </head>
   <body>
-    <canvas id="scene" aria-label="手势粒子画布：用摄像头手势或手指鼠标控制发光粒子图形"></canvas>
+    <canvas id="scene" aria-label="手势粒子画布：用摄像头手势或手指鼠标控制紫色粒子土星"></canvas>
     <div class="vignette" aria-hidden="true"></div>
 
     <header>
-      <h1>手势粒子</h1>
-      <p id="hint">握拳粒子聚合，张开发散成星云，转动手腕可旋转，捏合爆散换色</p>
+      <h1>土星 · 随手而生</h1>
+      <p id="hint">握拳粒子聚合，张开发散成星云，转动手腕可旋转</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
     <div class="cam-stack">
       <div class="cam-preview" id="camPreview"><video id="cam" playsinline muted autoplay></video></div>
-      <div class="status-chip">
-        <div class="gesture" id="statusText">未检测到手</div>
-        <div class="mode-line" id="modeLine">等待启动</div>
-        <div class="diag-line" id="diagLine">自检：识别模型未启动</div>
-        <button id="btnCamRetry" type="button">开启摄像头</button>
-      </div>
     </div>
 
-    <div class="controls">
-      <div class="panel" role="group" aria-label="粒子图形">
-        <span class="label">图形</span>
-        <button class="seg-btn" type="button" data-shape="heart" aria-pressed="true">爱心</button>
-        <button class="seg-btn" type="button" data-shape="sphere" aria-pressed="false">球体</button>
-        <button class="seg-btn" type="button" data-shape="saturn" aria-pressed="false">土星环</button>
-        <button class="seg-btn" type="button" data-shape="flower" aria-pressed="false">花朵</button>
-      </div>
+    <div class="status-bar">
+      <span class="gesture" id="statusText">未检测到手</span>
+      <span class="mode-line" id="modeLine">等待启动</span>
+      <span class="diag-line" id="diagLine">自检：识别模型未启动</span>
+      <button id="btnCamRetry" type="button">开启摄像头</button>
     </div>
 
     <div id="startScreen">
       <div class="start-card">
-        <h2>手势粒子</h2>
-        <p class="sub">打开摄像头，对着镜头做手势——<br />几千颗柔光粒子会跟着你的手聚合、成形、发散、旋转。</p>
+        <h2>粒子土星</h2>
+        <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，跟着你的手聚合、发散、旋转。</p>
         <div class="gesture-list">
-          <div class="row"><span class="dot" style="background:#8ea6ff"></span><span><b>握拳</b>　粒子向中心聚合，收成发光核心</span></div>
-          <div class="row"><span class="dot" style="background:#f5c96b"></span><span><b>半开手掌</b>　粒子展开成完整图形，最清晰</span></div>
-          <div class="row"><span class="dot" style="background:#ff9ecf"></span><span><b>完全张开</b>　粒子向外发散，化作漂移的星云</span></div>
-          <div class="row"><span class="dot" style="background:#c9a2ff"></span><span><b>拧手腕 / 横移手</b>　粒子团跟着旋转</span></div>
-          <div class="row"><span class="dot" style="background:#7fe3d0"></span><span><b>拇指捏合食指</b>　爆散一次并切换颜色</span></div>
+          <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>握拳 / 收拢</b>　星尘聚回成形，缩成亮核加细环</span></div>
+          <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>半开手掌</b>　土星完整成形，球核与光环最清晰</span></div>
+          <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘</span></div>
+          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>拧手腕 / 倾斜手掌</b>　土星在 3D 里跟着倾斜旋转</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(255,217,140,.88)">本次更新：粒子改用柔光渲染——每颗都带柔和光晕，大小、亮度、深浅各有层次，聚合时核心炽亮，发散时化作光尘。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：单土星极简版——只留一颗紫色粒子土星，粒子更细更密，界面收到最简。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -353,20 +270,20 @@
         var sp = spriteCache[key];
         if (sp) return sp;
         sp = document.createElement('canvas');
-        sp.width = 96; sp.height = 96;
+        sp.width = 48; sp.height = 48;
         var sctx = sp.getContext('2d');
-        // 炽亮核心 → 柔和光晕 → 完全透明，三段衰减，无硬边
-        var g = sctx.createRadialGradient(48, 48, 0, 48, 48, 48);
+        // 炽亮核心 → 柔和光晕 → 完全透明，三段衰减，无硬边（小尺寸精灵，细点渲染更省算力）
+        var g = sctx.createRadialGradient(24, 24, 0, 24, 24, 24);
         g.addColorStop(0, 'hsla(' + key + ',100%,97%,0.95)');
         g.addColorStop(0.16, 'hsla(' + key + ',99%,84%,0.72)');
         g.addColorStop(0.38, 'hsla(' + key + ',95%,66%,0.30)');
         g.addColorStop(0.7, 'hsla(' + key + ',92%,58%,0.08)');
         g.addColorStop(1, 'hsla(' + key + ',90%,55%,0)');
         sctx.fillStyle = g;
-        sctx.fillRect(0, 0, 96, 96);
+        sctx.fillRect(0, 0, 48, 48);
         // 中心一颗近乎纯白的实心小核，让密集处叠加出真正的亮芯
         sctx.beginPath();
-        sctx.arc(48, 48, 5, 0, 6.2832);
+        sctx.arc(24, 24, 2.5, 0, 6.2832);
         sctx.fillStyle = 'hsla(' + key + ',100%,98%,0.9)';
         sctx.fill();
         spriteCache[key] = sp;
@@ -379,28 +296,28 @@
         var sp = starCache[key];
         if (sp) return sp;
         sp = document.createElement('canvas');
-        sp.width = 128; sp.height = 128;
+        sp.width = 64; sp.height = 64;
         var sctx = sp.getContext('2d');
-        var g = sctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        var g = sctx.createRadialGradient(32, 32, 0, 32, 32, 32);
         g.addColorStop(0, 'hsla(' + key + ',100%,96%,0.95)');
         g.addColorStop(0.16, 'hsla(' + key + ',98%,80%,0.55)');
         g.addColorStop(0.45, 'hsla(' + key + ',92%,62%,0.16)');
         g.addColorStop(1, 'hsla(' + key + ',90%,55%,0)');
         sctx.fillStyle = g;
-        sctx.fillRect(0, 0, 128, 128);
+        sctx.fillRect(0, 0, 64, 64);
         sctx.globalCompositeOperation = 'lighter';
-        var hg = sctx.createLinearGradient(0, 0, 128, 0);
+        var hg = sctx.createLinearGradient(0, 0, 64, 0);
         hg.addColorStop(0, 'hsla(' + key + ',100%,85%,0)');
         hg.addColorStop(0.5, 'hsla(' + key + ',100%,92%,0.8)');
         hg.addColorStop(1, 'hsla(' + key + ',100%,85%,0)');
         sctx.fillStyle = hg;
-        sctx.fillRect(0, 61.5, 128, 5);
-        var vg = sctx.createLinearGradient(0, 0, 0, 128);
+        sctx.fillRect(0, 30.75, 64, 2.5);
+        var vg = sctx.createLinearGradient(0, 0, 0, 64);
         vg.addColorStop(0, 'hsla(' + key + ',100%,85%,0)');
         vg.addColorStop(0.5, 'hsla(' + key + ',100%,92%,0.8)');
         vg.addColorStop(1, 'hsla(' + key + ',100%,85%,0)');
         sctx.fillStyle = vg;
-        sctx.fillRect(61.5, 0, 5, 128);
+        sctx.fillRect(30.75, 0, 2.5, 64);
         starCache[key] = sp;
         return sp;
       }
@@ -409,7 +326,7 @@
       function getGlowSprite(kind){
         var sp = glowCache[kind];
         if (sp) return sp;
-        var col = kind === 'blue' ? '170,195,255' : (kind === 'flash' ? '255,240,200' : '245,201,107');
+        var col = kind === 'blue' ? '168,150,255' : (kind === 'flash' ? '232,220,255' : '150,116,245');
         sp = document.createElement('canvas');
         sp.width = 256; sp.height = 256;
         var gctx = sp.getContext('2d');
@@ -423,12 +340,12 @@
         return sp;
       }
 
-      /* ================= 颜色主题（捏合时切换） ================= */
+      /* ================= 颜色主题（捏合时在紫色系内微调） ================= */
       var THEMES = [
-        { name: '金蓝星尘', hues: [43, 218, 268, 192], w: [0.30, 0.30, 0.24, 0.16] },
-        { name: '熔金落日', hues: [43, 28, 55, 14],  w: [0.38, 0.26, 0.22, 0.14] },
-        { name: '冰蓝极光', hues: [205, 190, 225, 168], w: [0.34, 0.26, 0.22, 0.18] },
-        { name: '紫夜星云', hues: [268, 288, 322, 240], w: [0.36, 0.26, 0.20, 0.18] }
+        { name: '紫夜星尘', hues: [266, 282, 250, 296], w: [0.36, 0.26, 0.22, 0.16] },
+        { name: '蓝紫微光', hues: [252, 266, 238, 282], w: [0.36, 0.26, 0.22, 0.16] },
+        { name: '薰衣草雾', hues: [278, 292, 262, 306], w: [0.36, 0.26, 0.22, 0.16] },
+        { name: '深紫星核', hues: [258, 272, 244, 288], w: [0.36, 0.26, 0.22, 0.16] }
       ];
       var themeIdx = 0;
       function pickThemeHue(){
@@ -442,8 +359,8 @@
       }
 
       /* ================= 粒子与图形 ================= */
-      var MAX_POOL = isMobile ? 6000 : 7000;
-      var BASE_COUNT = isMobile ? 3800 : 5400;
+      var MAX_POOL = isMobile ? 11000 : 15000;
+      var BASE_COUNT = isMobile ? 8500 : 13000;
       var targetCount = BASE_COUNT;
       var activeCount = 0;
       var autoScale = 1;
@@ -464,70 +381,35 @@
       var vy = new Float32Array(MAX_POOL);
       var pDepth = new Float32Array(MAX_POOL);   // 投影后的深度系数（大小/亮度）
       var pHero = new Uint8Array(MAX_POOL);      // 少数「主星」：更大更亮、带十字星芒
+      var pRing = new Uint8Array(MAX_POOL);      // 1 = 光环粒子，0 = 球核粒子
       var pBright = new Float32Array(MAX_POOL);  // 每颗粒子的个体亮度系数
       var scatX = new Float32Array(MAX_POOL);    // 发散时每颗粒子的随机散开方向（3D）
       var scatY = new Float32Array(MAX_POOL);
       var scatZ = new Float32Array(MAX_POOL);
 
-      var shapeName = 'heart';
-      var rotMode = 'y'; // 'y' 立体旋转 / 'z' 平面旋转（花朵）
+      var shapeName = 'saturn';
+      var rotMode = 'y'; // 土星恒为 3D 立体旋转
 
-      function genShape(name){
-        var i, a, b, r, x, y, z;
-        if (name === 'heart'){
-          rotMode = 'y';
-          for (i = 0; i < MAX_POOL; i++){
-            var t = Math.random() * Math.PI * 2;
-            // 经典爱心曲线
-            var ox = 16 * Math.pow(Math.sin(t), 3);
-            var oy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-            var k = Math.pow(Math.random(), 0.6);       // 向中心填充
-            x = ox * k / 17;
-            y = -oy * k / 17 - 0.13;                    // 翻到屏幕方向：尖朝下、双瓣朝上，并居中
-            z = (Math.random() * 2 - 1) * 0.34 * Math.sqrt(Math.max(0, 1 - k * k)) + (Math.random() - 0.5) * 0.03;
-            baseX[i] = x; baseY[i] = y; baseZ[i] = z;
-          }
-        } else if (name === 'sphere'){
-          rotMode = 'y';
-          for (i = 0; i < MAX_POOL; i++){
+      function genShape(){
+        var i, a, b, r;
+        for (i = 0; i < MAX_POOL; i++){
+          if (Math.random() < 0.34){ // 球核：中心密、向外渐稀，中心最亮
+            pRing[i] = 0;
             a = Math.random() * Math.PI * 2;
             b = Math.acos(2 * Math.random() - 1);
-            r = 0.92 * (0.35 + 0.65 * Math.cbrt(Math.random()));
+            r = 0.46 * Math.pow(Math.cbrt(Math.random()), 1.35);
             baseX[i] = r * Math.sin(b) * Math.cos(a);
             baseY[i] = r * Math.cos(b);
             baseZ[i] = r * Math.sin(b) * Math.sin(a);
-          }
-        } else if (name === 'saturn'){
-          rotMode = 'y';
-          for (i = 0; i < MAX_POOL; i++){
-            if (Math.random() < 0.36){ // 核心球
-              a = Math.random() * Math.PI * 2;
-              b = Math.acos(2 * Math.random() - 1);
-              r = 0.5 * (0.4 + 0.6 * Math.cbrt(Math.random()));
-              baseX[i] = r * Math.sin(b) * Math.cos(a);
-              baseY[i] = r * Math.cos(b);
-              baseZ[i] = r * Math.sin(b) * Math.sin(a);
-            } else { // 光环（收窄成明确的环带）
-              a = Math.random() * Math.PI * 2;
-              r = 0.85 + Math.pow(Math.random(), 1.2) * 0.39;
-              baseX[i] = r * Math.cos(a);
-              baseY[i] = (Math.random() - 0.5) * 0.035;
-              baseZ[i] = r * Math.sin(a);
-            }
-          }
-        } else { // flower 玫瑰曲线
-          rotMode = 'z';
-          for (i = 0; i < MAX_POOL; i++){
+          } else { // 光环：内缘 0.62 起（与球核留一圈空隙）到 1.24，内密外疏、有厚度
+            pRing[i] = 1;
             a = Math.random() * Math.PI * 2;
-            var rr = Math.cos(3 * a); // 三瓣玫瑰线，可正可负（自动成瓣）
-            var fill = 0.25 + 0.75 * Math.random();
-            x = rr * Math.cos(a) * fill;
-            y = rr * Math.sin(a) * fill;
-            z = 0.20 * Math.sin(3 * a) * fill + (Math.random() - 0.5) * 0.05;
-            baseX[i] = x; baseY[i] = y; baseZ[i] = z;
+            var rr2 = 0.62 + Math.pow(Math.random(), 1.55) * 0.62;
+            var thick = (Math.random() + Math.random() + Math.random()) / 3 - 0.5; // 近高斯，中间厚
+            baseX[i] = rr2 * Math.cos(a);
+            baseY[i] = thick * 0.085 * (1.15 - (rr2 - 0.62) / 0.62 * 0.45);
+            baseZ[i] = rr2 * Math.sin(a);
           }
-        }
-        for (i = 0; i < MAX_POOL; i++){
           spread[i] = Math.pow(Math.random(), 1.3);
           if (px[i] === 0 && py[i] === 0){ px[i] = W / 2; py[i] = H / 2; }
         }
@@ -537,12 +419,12 @@
       }
       function initParticles(){
         for (var i = 0; i < MAX_POOL; i++){
-          // 大小三档分布：多数小尘、适量中粒、少数大粒，另有极少数「主星」
+          // 细密小粒子为主：多数是细尘，少数稍大，极少数「主星」点缀
           var tierR = Math.random();
-          pSize[i] = tierR < 0.62 ? 0.35 + Math.random() * 0.55
-                   : tierR < 0.93 ? 0.9 + Math.random() * 0.65
-                   : 1.55 + Math.random() * 0.85;
-          pHero[i] = Math.random() < 0.045 ? 1 : 0;
+          pSize[i] = tierR < 0.78 ? 0.22 + Math.random() * 0.38
+                   : tierR < 0.97 ? 0.6 + Math.random() * 0.45
+                   : 1.05 + Math.random() * 0.5;
+          pHero[i] = Math.random() < 0.018 ? 1 : 0;
           pBright[i] = 0.7 + Math.random() * 0.55;
           pPhase[i] = Math.random() * Math.PI * 2;
           pTw[i] = 0.5 + Math.random() * 1.5;
@@ -652,15 +534,15 @@
       }
       function paintSky(){
         var g = ctx.createRadialGradient(W * 0.5, H * 0.38, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.85);
-        g.addColorStop(0, '#0d1230');
-        g.addColorStop(0.45, '#070b20');
-        g.addColorStop(1, '#02030a');
+        g.addColorStop(0, '#080514');
+        g.addColorStop(0.45, '#05030d');
+        g.addColorStop(1, '#010103');
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
-        for (var i = 0; i < 130; i++){
-          var a = 0.12 + Math.random() * 0.4;
+        for (var i = 0; i < 60; i++){
+          var a = 0.05 + Math.random() * 0.16;
           ctx.fillStyle = 'rgba(210,220,255,' + a.toFixed(3) + ')';
           var r = Math.random() < 0.88 ? 0.6 : 1.1;
           ctx.beginPath();
@@ -818,7 +700,7 @@
         btnCamRetry.classList.add('show');
         modeLineEl.textContent = '模拟模式 · 指针是手的位置';
         setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
-        hintEl.textContent = '模拟模式：按住 = 握拳聚合，松开放开 = 成形，滚轮推满 = 发散，横向拖动 = 旋转，双击 = 爆散换色';
+        hintEl.textContent = '模拟模式：按住 = 握拳聚合，松开放开 = 成形，滚轮推满 = 发散，横向拖动 = 旋转';
         target.handPresent = true;
         target.cx = anim.cx; target.cy = anim.cy;
         target.open = simOpen;
@@ -859,7 +741,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '握拳粒子聚合，半开成形，完全张开发散成星云；拧手腕或横移手掌可旋转，捏合爆散换色';
+          hintEl.textContent = '收拢手聚成土星，张开发散成星尘；拧手腕或倾斜手掌可旋转土星';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -1061,17 +943,7 @@
       });
       canvas.addEventListener('touchmove', function(e){ e.preventDefault(); }, { passive: false });
 
-      /* ================= 图形切换按钮 ================= */
-      var shapeBtns = document.querySelectorAll('[data-shape]');
-      shapeBtns.forEach(function(btn){
-        btn.addEventListener('click', function(){
-          shapeBtns.forEach(function(b){ b.setAttribute('aria-pressed', 'false'); });
-          btn.setAttribute('aria-pressed', 'true');
-          shapeName = btn.getAttribute('data-shape');
-          genShape(shapeName);
-          burstFX(anim.cx, anim.cy, 4);
-        });
-      });
+      /* 图形固定为土星，无切换按钮 */
 
       /* ================= 主循环 ================= */
       var last = performance.now();
@@ -1145,31 +1017,32 @@
         rotUser.spin += rotUser.spinVel * dt;
         rotUser.spinVel *= Math.pow(0.90, dt);
         var userRot = rotUser.tilt + rotUser.spin;
-        rotY += dt * 0.14 * (rotMode === 'y' ? 1 : 0.22);
+        rotY += dt * 0.14;
         rotZ += dt * 0.10;
-        var totalY = rotY + (rotMode === 'y' ? userRot : 0);
-        var totalZ = rotZ + (rotMode === 'z' ? userRot : 0);
-        var tiltX = rotMode === 'y' ? (shapeName === 'saturn' ? 0.62 : 0.38) : 0.12;
+        var totalY = rotY + userRot;
+        var totalZ = rotZ;
+        // 手腕倾斜同时驱动俯仰：静止时是经典的侧倾椭圆环视角，拧手腕可转到近正对镜头（核 + 圆环）或压扁成近侧面
+        var tiltX = 0.60 + rotUser.tilt * 0.45;
+        if (tiltX < 0.12) tiltX = 0.12; else if (tiltX > 1.45) tiltX = 1.45;
         var cosY = Math.cos(totalY), sinY = Math.sin(totalY);
         var cosX = Math.cos(tiltX), sinX = Math.sin(tiltX);
         var cosZ = Math.cos(totalZ), sinZ = Math.sin(totalZ);
 
-        // 中心光晕（预渲染精灵贴图）：聚合时紧实明亮，发散时摊开变淡
-        var glowR = R * (1.12 + neb * 0.9) + 24;
-        ctx.globalAlpha = Math.min(0.36, 0.10 + core * 0.22 + neb * 0.04);
-        ctx.drawImage(getGlowSprite(core > 0.45 ? 'blue' : 'gold'), anim.cx - glowR, anim.cy - glowR, glowR * 2, glowR * 2);
-        ctx.globalAlpha = 1;
-
+        // 不画中心光晕贴图：逐帧重绘的圆形辉光会在拖尾平衡下留下一圈假圆盘边界；
+        // 中心的亮度完全由粒子自身的加色叠加产生（球核越密越亮）
         ctx.globalCompositeOperation = 'lighter';
         // 聚合时弹簧更硬（吸入感），发散时更软（漂浮感）
         var kSpring = 0.05 + core * 0.05 - neb * 0.018, dampF = Math.pow(0.86 + neb * 0.05, dt);
 
         for (var i = 0; i < activeCount; i++){
           // 目标点 = 图形基点 × 散开系数 + 随机散开偏移 × 发散量 + 缓慢漂移 × 发散量
+          // 聚合极端时光环收紧成细环（半径缩小、厚度压扁）；发散极端时星尘铺满大半个屏幕
+          var ringScale = pRing[i] ? (0.70 + 0.30 * formT) : 1;
+          var ringFlat = pRing[i] ? (0.35 + 0.65 * formT) : 1;
           var indiv = 1 + neb * 0.18 * spread[i];
-          var bx = baseX[i] * spreadCoef * indiv + scatX[i] * neb * 0.9 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.055 * neb;
-          var by = baseY[i] * spreadCoef * indiv + scatY[i] * neb * 0.9 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.055 * neb;
-          var bz = baseZ[i] * spreadCoef + scatZ[i] * neb * 0.9;
+          var bx = baseX[i] * spreadCoef * indiv * ringScale + scatX[i] * neb * 2.1 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.09 * neb;
+          var by = baseY[i] * spreadCoef * indiv * ringFlat + scatY[i] * neb * 2.1 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.09 * neb;
+          var bz = baseZ[i] * spreadCoef * ringScale + scatZ[i] * neb * 2.1;
           var x1, y1, z1;
           if (rotMode === 'y'){
             x1 = bx * cosY + bz * sinY;
@@ -1204,15 +1077,17 @@
           var rrCore = Math.sqrt(bx * bx + by * by + bz * bz);
           var heat = core * Math.max(0, 1 - rrCore / 0.72);
           if (heat > 0.01){
-            var dh = ((46 - hue + 540) % 360) - 180; // 沿最短色环方向靠向金色
+            var dh = ((272 - hue + 540) % 360) - 180; // 沿最短色环方向靠向亮薰衣草紫（球核中心偏白紫）
             hue += dh * heat * 0.65;
           }
           var edgeDim = 1 - neb * 0.38 * Math.min(1, Math.max(0, (rrCore - 0.85) / 0.9));
           var hero = pHero[i] === 1;
-          var alpha = (0.16 + 0.34 * tw) * depthLight * pBright[i] * (0.85 + core * 0.6 - neb * 0.15) * edgeDim + heat * 0.30;
+          // 球核粒子更亮（中心偏白紫），光环粒子略暗，层次分明
+          var partLight = pRing[i] ? 1.06 : 1.22;
+          var alpha = (0.24 + 0.40 * tw) * depthLight * pBright[i] * partLight * (0.85 + core * 0.6 - neb * 0.15) * edgeDim + heat * 0.30;
           var alphaCap = hero ? 0.95 : 0.72;
           if (alpha > alphaCap) alpha = alphaCap;
-          var size = pSize[i] * 6.4 * Math.pow(persp, 1.15) * (1 + core * 0.3 + neb * 0.12) * (1 + heat * 0.3) * (hero ? 2.2 : 1);
+          var size = pSize[i] * 3.6 * Math.pow(persp, 1.15) * (1 + core * 0.3 + neb * 0.12) * (1 + heat * 0.3) * (hero ? 1.9 : 1);
           ctx.globalAlpha = alpha;
           ctx.drawImage(hero ? getStarSprite(hue) : getSprite(hue), px[i] - size / 2, py[i] - size / 2, size, size);
         }
@@ -1224,10 +1099,10 @@
           bu.r += 7.5 * dt;
           bu.alpha *= Math.pow(0.90, dt);
           if (bu.alpha < 0.02 || bu.r > 460){ bursts.splice(b, 1); continue; }
-          ctx.strokeStyle = 'rgba(255,226,160,' + bu.alpha.toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(216,196,255,' + bu.alpha.toFixed(3) + ')';
           ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r, 0, 6.2832); ctx.stroke();
-          ctx.strokeStyle = 'rgba(170,185,255,' + (bu.alpha * 0.55).toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(160,130,255,' + (bu.alpha * 0.55).toFixed(3) + ')';
           ctx.lineWidth = 1;
           ctx.beginPath(); ctx.arc(bu.x, bu.y, bu.r * 0.78, 0, 6.2832); ctx.stroke();
         }
@@ -1254,8 +1129,8 @@
           if (me.life > me.maxLife){ meteors.splice(m, 1); continue; }
           var fade = Math.sin(Math.PI * (me.life / me.maxLife));
           var grad = ctx.createLinearGradient(me.x, me.y, me.x - me.vx * 13, me.y - me.vy * 13);
-          grad.addColorStop(0, 'rgba(255,244,214,' + (0.85 * fade).toFixed(3) + ')');
-          grad.addColorStop(1, 'rgba(255,244,214,0)');
+          grad.addColorStop(0, 'rgba(230,220,255,' + (0.6 * fade).toFixed(3) + ')');
+          grad.addColorStop(1, 'rgba(230,220,255,0)');
           ctx.strokeStyle = grad;
           ctx.lineWidth = 1.6;
           ctx.beginPath();
