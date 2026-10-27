@@ -197,7 +197,7 @@
 
     <header>
       <h1>土星 · 随手而生</h1>
-      <p id="hint">默认是一颗完整土星：张开发散成星尘，捏合变得紧凑，指尖划动在任何状态下都能整体翻转</p>
+      <p id="hint">土星固定在画面中央：张开发散成星尘，捏合变得紧凑，指尖划动在任何状态下都能整体翻转</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
@@ -215,14 +215,14 @@
     <div id="startScreen">
       <div class="start-card">
         <h2>粒子土星</h2>
-        <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，跟着你的手聚合、发散、旋转。</p>
+        <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，固定在画面中央，只随你的手聚合、发散、翻转。</p>
         <div class="gesture-list">
           <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>放松手掌</b>　一颗标准大小的完整土星——球核、光环与中间的空隙都清清楚楚；手离开画面，它也回到这个样子</span></div>
           <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘；手一收拢，星尘就汇聚回土星</span></div>
           <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>捏合手指</b>　拇指尖贴近食指尖——越贴近，土星越紧凑：整体等比缩小收紧，比例不变；松开就平滑恢复。握拳收拢也能收紧</span></div>
           <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>指尖划动</b>　伸着食指在空中划动，像拨地球仪一样拨动整个粒子云——成形时翻转土星，发散成星尘时整片星尘像一张盘一样跟着翻转倾斜；上下左右自由翻，可以连续转满 360°</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：紧凑改由捏合主导——拇指与食指越贴近土星越小越紧凑，松开平滑恢复（捏合不再换色）；发散的星尘也能被指尖整体翻转；没有手时，土星自动回到标准成形态。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：土星固定在画面正中央，不再跟着手到处跑——你的手只管三件事：张合发散、捏合紧凑（握拳也可）、指尖划动翻转；位置定住了，翻转稳得多。没有手时，它也停在中央保持标准成形态。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -470,13 +470,12 @@
 
       /* ================= 动画状态（手势平滑后的值） ================= */
       var anim = {
-        cx: 0, cy: 0,          // 图形中心（屏幕坐标，平滑跟随）
+        cx: 0, cy: 0,          // 图形中心（锁定在画面正中央，不跟随任何输入平移）
         open: 0.55,            // 张合度 0=握拳 1=完全张开（平滑，只驱动发散）
         pinch: 0               // 捏合度 0=松开 1=两指贴紧（平滑，驱动紧凑）
       };
       // 原始目标（由摄像头手势或模拟输入写入）
       var target = {
-        cx: 0, cy: 0,
         open: 0.55,
         handPresent: false,
         pinchAmt: 0,           // 连续捏合度（拇指尖↔食指尖距离归一化），不再是触发开关
@@ -531,7 +530,7 @@
         canvas.width = Math.round(W * DPR);
         canvas.height = Math.round(H * DPR);
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        if (!anim.cx){ anim.cx = target.cx = W / 2; anim.cy = target.cy = H * 0.46; }
+        if (!anim.cx){ anim.cx = W / 2; anim.cy = H * 0.5; }
         paintSky();
       }
       function paintSky(){
@@ -576,15 +575,10 @@
         if (open < 0) open = 0; else if (open > 1) open = 1;
         target.open = open;
 
-        // 手的位置：掌心 5 个点的重心，镜像映射（自拍视角），中心略放大行程
+        // 掌心中心（归一化坐标）：只作轨迹球的相对基准与握拳拨转的增量来源；
+        // 粒子团位置已锁定在画面正中央，手的位置不再驱动任何平移
         var cxN = (lm[0].x + lm[5].x + lm[9].x + lm[13].x + lm[17].x) / 5;
         var cyN = (lm[0].y + lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 5;
-        var mx = 0.5 + (0.5 - cxN) * 1.3;   // 1 - cxN 为镜像，再绕中心放大 1.3 倍
-        var my = 0.5 + (cyN - 0.5) * 1.25;
-        if (mx < 0.04) mx = 0.04; else if (mx > 0.96) mx = 0.96;
-        if (my < 0.06) my = 0.06; else if (my > 0.94) my = 0.94;
-        target.cx = mx * W;
-        target.cy = my * H;
         target.handPresent = true;
         lastHandAt = performance.now();
 
@@ -593,8 +587,8 @@
         // 每帧取相对位置的增量累加进 yaw/pitch，不设上限、不回中：
         // 指尖在空中反复划动就能一圈圈转满 360°，任意方向自由翻；
         // 指尖停下，增量为 0，土星就停在当前朝向。
-        // 关键去耦：整只手平移时指尖与掌心同步移动、相对增量≈0，
-        // 所以「土星跟随掌心移动」和「指尖拨转」互不干扰。
+        // 关键去耦：整只手平移时指尖与掌心同步移动、相对增量≈0，不会误触发翻转；
+        // 土星位置固定在画面中央，本来就没有任何平移输入。
         // x 取负：画面是自拍镜像，指尖在屏幕里向右划 → yaw 正向（与模拟拖动同向）。
         var tipRelX = -((lm[8].x - cxN) / palmRef);
         var tipRelY = (lm[8].y - cyN) / palmRef;
@@ -602,7 +596,7 @@
           var dYaw = 0, dPitch = 0;
           if (open < 0.35){
             // 握拳时指尖被估算、精度差：改用掌心中心本身的移动增量拨转
-            // （位置跟随仍在，两者各半：手移到哪土星跟到哪，同时被拨着转）
+            // （纯增量输入：只拨转，不产生任何位置移动）
             var pdx = -(cxN - prevPalmC.x);
             var pdy = cyN - prevPalmC.y;
             if (Math.abs(pdx) < 0.0006) pdx = 0; // 死区压抖动
@@ -716,11 +710,10 @@
         camPreview.classList.remove('on');
         startScreen.classList.add('hidden');
         btnCamRetry.classList.add('show');
-        modeLineEl.textContent = '模拟模式 · 指针是手的位置';
+        modeLineEl.textContent = '模拟模式 · 拖动拨转，滚轮调张合';
         setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
-        hintEl.textContent = '模拟模式：按住 = 收紧成紧凑小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 拨转整个粒子云（发散成星尘也能整体翻转，无上限可转满 360°，松手停在当前朝向）';
+        hintEl.textContent = '模拟模式：土星固定在画面中央——按住 = 收紧成紧凑小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 拨转整个粒子云（只转不移位；发散成星尘也能整体翻转，无上限可转满 360°，松手停在当前朝向）';
         target.handPresent = true;
-        target.cx = anim.cx; target.cy = anim.cy;
         target.open = simOpen;
         target.pinchAmt = 0;
         simYaw = 0; simPitch = 0;
@@ -762,7 +755,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '放松就是一颗完整土星；张开发散成星尘，拇指贴近食指越捏越紧凑（握拳也可）；伸指在空中划动，成形与发散状态都能整体翻转（可转满 360°）';
+          hintEl.textContent = '土星固定在画面中央，不随手移动；放松就是一颗完整土星，张开发散成星尘，拇指贴近食指越捏越紧凑（握拳也可）；伸指在空中划动，成形与发散状态都能整体翻转（可转满 360°）';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -892,11 +885,6 @@
       var activePointers = {};
       var pinchDist0 = 0, simOpenAtPinch = 0.5;
 
-      function simSetPos(x, y){
-        if (inputMode !== 'sim') return;
-        target.cx = x; target.cy = y;
-        target.handPresent = true;
-      }
       canvas.addEventListener('pointermove', function(e){
         if (inputMode !== 'sim') return;
         // 拖动 = 轨迹球拨转（与摄像头指尖轨迹球同口径）：横向拖 → 左右翻（yaw），
@@ -918,11 +906,8 @@
           var d = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
           if (pinchDist0 > 0){
             simOpen = Math.min(1, Math.max(0.05, simOpenAtPinch + (d - pinchDist0) / 260));
-            target.open = simOpen; // 双指滑动实时调张合，优先于单指握拳
+            target.open = simOpen; // 双指滑动实时调张合，优先于单指握拳（位置固定，指针移动不产生位移）
           }
-          simSetPos((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-        } else {
-          simSetPos(e.clientX, e.clientY);
         }
       }, { passive: true });
       canvas.addEventListener('pointerdown', function(e){
@@ -940,7 +925,6 @@
           simHolding = true;
           target.open = 0; // 单指按住 = 握拳
         }
-        simSetPos(e.clientX, e.clientY);
       });
       function simRelease(e){
         if (simDownCount > 0) simDownCount--;
@@ -996,10 +980,10 @@
 
         /* —— 轨迹球朝向不回中：手指/指针停下，土星就停在当前朝向（无回中逻辑） —— */
 
-        /* —— 平滑跟随（防抖）：位置、张合度向目标趋近 —— */
-        var idleCx = W / 2, idleCy = H * 0.46;
-        var wantCx = target.handPresent ? target.cx : idleCx;
-        var wantCy = target.handPresent ? target.cy : idleCy;
+        /* —— 位置彻底锁定：中心永远在画面正中央，不随手、不随指尖、不随拖动平移；
+           手的输入只剩张合 / 捏合 / 指尖翻转三条通道。下面的平滑只在窗口尺寸
+           变化时把中心平滑归位到新中心，稳态下纹丝不动 —— */
+        var wantCx = W / 2, wantCy = H * 0.5;
         var wantOpen = target.handPresent ? target.open : 0.55;
         var wantPinch = target.handPresent ? target.pinchAmt : 0; // 无手时捏合归零：默认态 = 标准土星
         var posK = 1 - Math.pow(0.0001, dtMs / 1000); // 约百毫秒级平滑
