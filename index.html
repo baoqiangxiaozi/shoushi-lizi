@@ -197,7 +197,7 @@
 
     <header>
       <h1>土星 · 随手而生</h1>
-      <p id="hint">握拳粒子聚合，张开发散成星云，转动手腕可旋转</p>
+      <p id="hint">握拳土星收小成形，张开发散成星云，转动手腕可旋转</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
@@ -217,12 +217,12 @@
         <h2>粒子土星</h2>
         <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，跟着你的手聚合、发散、旋转。</p>
         <div class="gesture-list">
-          <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>握拳 / 收拢</b>　星尘聚回成形，缩成亮核加细环</span></div>
+          <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>握拳 / 收拢</b>　土星整体收小变紧凑——球核、光环与空隙的比例不变，只是更小更亮</span></div>
           <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>半开手掌</b>　土星完整成形，球核与光环最清晰</span></div>
           <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘</span></div>
           <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>拧手腕 / 倾斜手掌</b>　土星在 3D 里跟着倾斜旋转</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：单土星极简版——只留一颗紫色粒子土星，粒子更细更密，界面收到最简。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：握紧时不再缩成光团——任何张合度下都是完整的土星，只是大小不同；旋转改为整颗土星像实物模型一样刚性转动。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -388,7 +388,6 @@
       var scatZ = new Float32Array(MAX_POOL);
 
       var shapeName = 'saturn';
-      var rotMode = 'y'; // 土星恒为 3D 立体旋转
 
       function genShape(){
         var i, a, b, r;
@@ -515,7 +514,7 @@
         else if (inputMode === 'camera' && !target.handPresent){ gestureLabel = '未检测到手'; }
         else if (target.pinch){ gestureLabel = '🤏 捏合'; }
         else if (anim.open > 0.78){ gestureLabel = '✋ 张开 · 发散'; }
-        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 聚合'; }
+        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 小土星'; }
         else { gestureLabel = '✋ 半开 · 成形'; }
         setStatus(gestureLabel);
       }
@@ -700,7 +699,7 @@
         btnCamRetry.classList.add('show');
         modeLineEl.textContent = '模拟模式 · 指针是手的位置';
         setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
-        hintEl.textContent = '模拟模式：按住 = 握拳聚合，松开放开 = 成形，滚轮推满 = 发散，横向拖动 = 旋转';
+        hintEl.textContent = '模拟模式：按住 = 握拳收成小土星，松开 = 标准土星，滚轮推满 = 发散，横向拖动 = 旋转';
         target.handPresent = true;
         target.cx = anim.cx; target.cy = anim.cy;
         target.open = simOpen;
@@ -741,7 +740,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '收拢手聚成土星，张开发散成星尘；拧手腕或倾斜手掌可旋转土星';
+          hintEl.textContent = '握紧手土星收小成形，张开发散成星尘；拧手腕或倾斜手掌可旋转土星';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -949,7 +948,7 @@
       var last = performance.now();
       var fpsFrames = 0, fpsTime = 0;
       var qStage = 0; // 画质自适应档：0 满质量 / 1 降拖尾 / 2 降分辨率 / 3 才降粒子数
-      var rotY = 0, rotZ = 0;
+      var rotY = 0;
 
       function frame(now){
         requestAnimationFrame(frame);
@@ -1002,70 +1001,56 @@
         ctx.fillStyle = 'rgba(3,4,12,' + (qStage >= 1 ? 0.30 : 0.16).toFixed(3) + ')';
         ctx.fillRect(0, 0, W, H);
 
-        /* —— 图形几何：张合度连续驱动 聚合 → 成形 → 发散 ——
-           formT：0 = 紧团（图形融化、粒子压到中心）→ 1 = 成形（图形最清晰）
-           neb：  0 = 成形 → 1 = 完全发散（随机偏移 + 漂移，轮廓溶成星云） */
-        var formT = smooth01((anim.open - 0.05) / 0.45);
+        /* —— 图形几何：张合度连续驱动 收小 → 标准 → 发散 ——
+           任何张合度下土星都保持完整形状：球核、光环、两者空隙的比例恒定，只整体缩放。
+           握紧 = 等比收小、更紧凑更亮；半开 = 标准大小（最清晰）；
+           张开 = 略放大一点后开始溶解。neb：0 = 完整土星 → 1 = 完全发散成星云 */
         var neb = smooth01((anim.open - 0.55) / 0.45);
-        var core = 1 - formT;
-        var spreadCoef = 0.14 + 0.86 * formT + neb * 0.30;   // 基点离中心的距离系数
-        var R = Math.min(W, H) * 0.30 * (0.88 + formT * 0.12 + neb * 0.10);
+        var compact = Math.max(0, 1 - anim.open / 0.55);            // 握紧程度：1 = 握紧，0 = 半开及以上
+        var scaleAll = (0.52 + 0.48 * Math.min(1, anim.open / 0.55)) * (1 + neb * 0.10);
+        var R = Math.min(W, H) * 0.30 * scaleAll;
 
-        /* —— 旋转：缓慢自转 + 用户驱动（手腕倾斜跟随 + 横移/拖动速度累积） —— */
+        /* —— 旋转：整颗土星的刚性姿态角，两轴分开驱动 ——
+           俯仰 tiltX 只由手腕倾斜控制；绕 Y 轴转角只由缓慢自转 + 横移/拖动累积的 spin 构成 */
         var wantTilt = target.handPresent ? target.rotTilt : 0;
         rotUser.tilt += (wantTilt - rotUser.tilt) * Math.min(1, openK);
         rotUser.spin += rotUser.spinVel * dt;
         rotUser.spinVel *= Math.pow(0.90, dt);
-        var userRot = rotUser.tilt + rotUser.spin;
-        rotY += dt * 0.14;
-        rotZ += dt * 0.10;
-        var totalY = rotY + userRot;
-        var totalZ = rotZ;
-        // 手腕倾斜同时驱动俯仰：静止时是经典的侧倾椭圆环视角，拧手腕可转到近正对镜头（核 + 圆环）或压扁成近侧面
+        rotY += dt * 0.03;
+        var totalY = rotY + rotUser.spin;
+        // 俯仰角：静止时是经典的侧倾椭圆环视角，拧手腕可转到近正对镜头（核 + 正圆环）或压扁成近侧面
         var tiltX = 0.60 + rotUser.tilt * 0.45;
         if (tiltX < 0.12) tiltX = 0.12; else if (tiltX > 1.45) tiltX = 1.45;
         var cosY = Math.cos(totalY), sinY = Math.sin(totalY);
         var cosX = Math.cos(tiltX), sinX = Math.sin(tiltX);
-        var cosZ = Math.cos(totalZ), sinZ = Math.sin(totalZ);
 
         // 不画中心光晕贴图：逐帧重绘的圆形辉光会在拖尾平衡下留下一圈假圆盘边界；
         // 中心的亮度完全由粒子自身的加色叠加产生（球核越密越亮）
         ctx.globalCompositeOperation = 'lighter';
-        // 聚合时弹簧更硬（吸入感），发散时更软（漂浮感）
-        var kSpring = 0.05 + core * 0.05 - neb * 0.018, dampF = Math.pow(0.86 + neb * 0.05, dt);
+        // 弹簧偏硬，保证粒子紧跟整体旋转（刚性感）；收紧时更硬（紧凑），发散时变软（漂浮感）
+        var kSpring = 0.08 + compact * 0.02 - neb * 0.022, dampF = Math.pow(0.86 + neb * 0.05, dt);
 
         for (var i = 0; i < activeCount; i++){
-          // 目标点 = 图形基点 × 散开系数 + 随机散开偏移 × 发散量 + 缓慢漂移 × 发散量
-          // 聚合极端时光环收紧成细环（半径缩小、厚度压扁）；发散极端时星尘铺满大半个屏幕
-          var ringScale = pRing[i] ? (0.70 + 0.30 * formT) : 1;
-          var ringFlat = pRing[i] ? (0.35 + 0.65 * formT) : 1;
+          // 本体坐标：粒子在土星模型里的固定位置（球核点 / 光环平面点），比例永不改变；
+          // 只有发散时才叠加随机散开偏移与漂移，把完整土星连续溶成星云
           var indiv = 1 + neb * 0.18 * spread[i];
-          var bx = baseX[i] * spreadCoef * indiv * ringScale + scatX[i] * neb * 2.1 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.09 * neb;
-          var by = baseY[i] * spreadCoef * indiv * ringFlat + scatY[i] * neb * 2.1 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.09 * neb;
-          var bz = baseZ[i] * spreadCoef * ringScale + scatZ[i] * neb * 2.1;
-          var x1, y1, z1;
-          if (rotMode === 'y'){
-            x1 = bx * cosY + bz * sinY;
-            z1 = -bx * sinY + bz * cosY;
-            y1 = by * cosX - z1 * sinX;
-            z1 = by * sinX + z1 * cosX;
-          } else {
-            x1 = bx * cosZ - by * sinZ;
-            y1 = bx * sinZ + by * cosZ;
-            z1 = bz;
-          }
+          var bx = baseX[i] * indiv + scatX[i] * neb * 2.1 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.09 * neb;
+          var by = baseY[i] * indiv + scatY[i] * neb * 2.1 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.09 * neb;
+          var bz = baseZ[i] * indiv + scatZ[i] * neb * 2.1;
+          // 刚性整体旋转：全体粒子共用同一个变换——先绕 Y 轴自转，再绕 X 轴俯仰倾斜。
+          // 环始终套在核上、倾角随整体一起变（正对 = 核 + 正圆环，侧看 = 椭圆环），不做逐粒子公转
+          var x1 = bx * cosY + bz * sinY;
+          var z1 = -bx * sinY + bz * cosY;
+          var y1 = by * cosX - z1 * sinX;
+          z1 = by * sinX + z1 * cosX;
           var persp = 6.5 / (6.5 + z1); // 弱透视：近大远小，但不把近侧粒子甩到画面外
           var tx = anim.cx + x1 * persp * R;
           var ty = anim.cy + y1 * persp * R;
           pDepth[i] = persp;
 
-          // 弹簧趋近目标点
+          // 弹簧趋近目标点（没有额外的向心吸入：握紧靠整体等比缩放收紧，形状不融化）
           vx[i] = (vx[i] + (tx - px[i]) * kSpring * dt) * dampF;
           vy[i] = (vy[i] + (ty - py[i]) * kSpring * dt) * dampF;
-          if (core > 0.02){ // 聚合时额外给一点向中心的吸入速度
-            vx[i] += (anim.cx - px[i]) * 0.0035 * core * dt;
-            vy[i] += (anim.cy - py[i]) * 0.0035 * core * dt;
-          }
           px[i] += vx[i] * dt;
           py[i] += vy[i] * dt;
 
@@ -1073,21 +1058,16 @@
           var hue = pHue[i] + Math.sin(t * 0.13 + pPhase[i] * 0.7) * 12;
           // 深度：近亮远暗，旋转时前后层次分明
           var depthLight = 0.45 + 0.6 * persp;
-          // 聚合「炽热」：越靠近中心越亮、色温向白金靠拢；发散时外圈粒子渐暗
+          // 握紧时全体均匀提亮一点（紧凑感，不做中心炽热融化）；发散时外圈粒子渐暗
           var rrCore = Math.sqrt(bx * bx + by * by + bz * bz);
-          var heat = core * Math.max(0, 1 - rrCore / 0.72);
-          if (heat > 0.01){
-            var dh = ((272 - hue + 540) % 360) - 180; // 沿最短色环方向靠向亮薰衣草紫（球核中心偏白紫）
-            hue += dh * heat * 0.65;
-          }
           var edgeDim = 1 - neb * 0.38 * Math.min(1, Math.max(0, (rrCore - 0.85) / 0.9));
           var hero = pHero[i] === 1;
           // 球核粒子更亮（中心偏白紫），光环粒子略暗，层次分明
           var partLight = pRing[i] ? 1.06 : 1.22;
-          var alpha = (0.24 + 0.40 * tw) * depthLight * pBright[i] * partLight * (0.85 + core * 0.6 - neb * 0.15) * edgeDim + heat * 0.30;
+          var alpha = (0.24 + 0.40 * tw) * depthLight * pBright[i] * partLight * (0.88 + compact * 0.5 - neb * 0.15) * edgeDim;
           var alphaCap = hero ? 0.95 : 0.72;
           if (alpha > alphaCap) alpha = alphaCap;
-          var size = pSize[i] * 3.6 * Math.pow(persp, 1.15) * (1 + core * 0.3 + neb * 0.12) * (1 + heat * 0.3) * (hero ? 1.9 : 1);
+          var size = pSize[i] * 3.6 * Math.pow(persp, 1.15) * (1 + neb * 0.12) * (hero ? 1.9 : 1);
           ctx.globalAlpha = alpha;
           ctx.drawImage(hero ? getStarSprite(hue) : getSprite(hue), px[i] - size / 2, py[i] - size / 2, size, size);
         }
