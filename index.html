@@ -215,7 +215,7 @@
     <div id="startScreen">
       <div class="start-card">
         <h2>粒子土星</h2>
-        <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，固定在画面中央，只随你的手聚合、发散、翻转。</p>
+        <p class="sub">打开摄像头，对着镜头做手势——<br />数万颗紫色细粒子组成一颗土星，固定在画面中央，只随你的手聚合、发散、翻转。</p>
         <div class="gesture-list">
           <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>放松手掌</b>　一颗标准大小的完整土星——球核、光环与中间的空隙都清清楚楚；手离开画面，它也回到这个样子</span></div>
           <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘；手一收拢，星尘就汇聚回土星</span></div>
@@ -359,8 +359,12 @@
       }
 
       /* ================= 粒子与图形 ================= */
-      var MAX_POOL = isMobile ? 11000 : 15000;
-      var BASE_COUNT = isMobile ? 8500 : 13000;
+      var MAX_POOL = isMobile ? 11000 : 32000;
+      var BASE_COUNT = isMobile ? 8500 : 30000;
+      // 桌面端粒子档位：满档 30,000，帧率撑不住时逐档降到 22k → 16k → 13k，宁可少也不能卡；
+      // 性能足够的机器稳定在满档。手机端保持 8,500 不走此档位表。
+      var DESKTOP_TIERS = [30000, 22000, 16000, 13000];
+      var desktopTier = 0;
       var targetCount = BASE_COUNT;
       var activeCount = 0;
       var autoScale = 1;
@@ -1019,13 +1023,15 @@
         anim.fist += (wantFist - anim.fist) * Math.min(1, openK);
         refreshGestureLabel();
 
-        /* —— 性能自适应（分档降级：先降拖尾 → 再降分辨率 → 最后才降粒子数；帧率恢复时反向升档） —— */
+        /* —— 性能自适应（分档降级：先降拖尾 → 再降分辨率 → 桌面端逐档降粒子数 30k→22k→16k→13k → 最后细降；帧率恢复时反向升档，粒子档位只降不升避免来回抖动） —— */
         if (!document.hidden){
           fpsFrames++; fpsTime += dtMs;
           if (fpsTime >= 3000){
             var fps = fpsFrames * 1000 / fpsTime;
             if (fps < 42){
-              if (qStage < 3){ qStage++; if (qStage === 2) resize(); }
+              if (qStage < 2){ qStage++; if (qStage === 2) resize(); }
+              else if (!isMobile && desktopTier < DESKTOP_TIERS.length - 1){ desktopTier++; targetCount = DESKTOP_TIERS[desktopTier]; if (qStage < 3) qStage = 3; }
+              else if (qStage < 3){ qStage++; }
               else if (autoScale > 0.55) autoScale = Math.max(0.55, autoScale - 0.09);
             } else if (fps > 57){
               if (qStage >= 3 && autoScale < 1) autoScale = Math.min(1, autoScale + 0.05);
