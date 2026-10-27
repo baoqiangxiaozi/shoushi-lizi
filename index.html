@@ -197,7 +197,7 @@
 
     <header>
       <h1>土星 · 随手而生</h1>
-      <p id="hint">握拳土星收小成形，张开发散成星云，指尖在空中划动土星跟着自由翻转</p>
+      <p id="hint">默认是一颗完整土星：张开发散成星尘，捏合变得紧凑，指尖划动在任何状态下都能整体翻转</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
@@ -217,12 +217,12 @@
         <h2>粒子土星</h2>
         <p class="sub">打开摄像头，对着镜头做手势——<br />近万颗紫色细粒子组成一颗土星，跟着你的手聚合、发散、旋转。</p>
         <div class="gesture-list">
-          <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>握拳 / 收拢</b>　土星整体收小变紧凑——球核、光环与空隙的比例不变，只是更小更亮</span></div>
-          <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>半开手掌</b>　土星完整成形，球核与光环最清晰</span></div>
-          <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘</span></div>
-          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>指尖划动</b>　伸着食指在空中划动，像拨地球仪一样拨土星——上下左右自由翻转，可以连续转满 360°，指尖停下土星就停住</span></div>
+          <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>放松手掌</b>　一颗标准大小的完整土星——球核、光环与中间的空隙都清清楚楚；手离开画面，它也回到这个样子</span></div>
+          <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘；手一收拢，星尘就汇聚回土星</span></div>
+          <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>捏合手指</b>　拇指尖贴近食指尖——越贴近，土星越紧凑：整体等比缩小收紧，比例不变；松开就平滑恢复。握拳收拢也能收紧</span></div>
+          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>指尖划动</b>　伸着食指在空中划动，像拨地球仪一样拨动整个粒子云——成形时翻转土星，发散成星尘时整片星尘像一张盘一样跟着翻转倾斜；上下左右自由翻，可以连续转满 360°</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：旋转改由指尖直接拨动——指尖在空中划到哪，土星就跟着翻到哪，没有角度上限、不会自己转回去；整只手平移只带动土星移动，不会误转。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：紧凑改由捏合主导——拇指与食指越贴近土星越小越紧凑，松开平滑恢复（捏合不再换色）；发散的星尘也能被指尖整体翻转；没有手时，土星自动回到标准成形态。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -471,14 +471,15 @@
       /* ================= 动画状态（手势平滑后的值） ================= */
       var anim = {
         cx: 0, cy: 0,          // 图形中心（屏幕坐标，平滑跟随）
-        open: 0.55             // 张合度 0=握拳聚合 1=完全张开发散（平滑）
+        open: 0.55,            // 张合度 0=握拳 1=完全张开（平滑，只驱动发散）
+        pinch: 0               // 捏合度 0=松开 1=两指贴紧（平滑，驱动紧凑）
       };
       // 原始目标（由摄像头手势或模拟输入写入）
       var target = {
         cx: 0, cy: 0,
         open: 0.55,
         handPresent: false,
-        pinch: false,
+        pinchAmt: 0,           // 连续捏合度（拇指尖↔食指尖距离归一化），不再是触发开关
         rotYaw: 0,             // 指尖轨迹球累加的左右翻转角（无上限，可转满 360°）
         rotPitch: 0,           // 指尖轨迹球累加的上下翻转角（无上限，可转满 360°）
         rotRoll: 0             // 已停用（轨迹球驱动不需要平面 roll）
@@ -514,10 +515,10 @@
       function refreshGestureLabel(){
         if (inputMode === 'camera' && resultsCount === 0){ gestureLabel = '引擎启动中…'; }
         else if (inputMode === 'camera' && !target.handPresent){ gestureLabel = '未检测到手'; }
-        else if (target.pinch){ gestureLabel = '🤏 捏合'; }
         else if (anim.open > 0.78){ gestureLabel = '✋ 张开 · 发散'; }
-        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 小土星'; }
-        else { gestureLabel = '✋ 半开 · 成形'; }
+        else if (anim.pinch > 0.45){ gestureLabel = '🤏 捏合 · 紧凑'; }
+        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 紧凑'; }
+        else { gestureLabel = '✋ 放松 · 土星'; }
         setStatus(gestureLabel);
       }
 
@@ -561,8 +562,6 @@
         if (x < 0) x = 0; else if (x > 1) x = 1;
         return x * x * (3 - 2 * x);
       }
-      var pinchLatched = false;
-      var lastPinchAt = 0;
       function processLandmarks(lm){
         // 以 腕→中指根 的距离为手掌尺度，做归一化
         var palmRef = lmDist(lm[0], lm[9]);
@@ -628,20 +627,13 @@
         prevPalmC = { x: cxN, y: cyN };
         target.rotRoll = 0;
 
-        // 捏合：拇指尖↔食指尖距离（带迟滞防抖）
+        // 捏合度（连续映射，不是触发开关）：拇指尖(4)↔食指尖(8) 距离按手掌尺度归一化，
+        // 两指越贴近捏合度越高——0.78 倍掌宽及以上算完全松开，0.23 倍及以下算贴紧。
+        // 捏合只驱动「紧凑」，不再触发爆散/换色。
         var pinchRatio = lmDist(lm[4], lm[8]) / palmRef;
-        if (!pinchLatched && pinchRatio < 0.34){
-          pinchLatched = true;
-          target.pinch = true;
-          var now = performance.now();
-          if (now - lastPinchAt > 650){
-            lastPinchAt = now;
-            cycleThemeWithBurst();
-          }
-        } else if (pinchLatched && pinchRatio > 0.55){
-          pinchLatched = false;
-          target.pinch = false;
-        }
+        var pa = (0.78 - pinchRatio) / 0.55;
+        if (pa < 0) pa = 0; else if (pa > 1) pa = 1;
+        target.pinchAmt = smooth01(pa);
       }
       var lastHandAt = 0;
       var prevTipRel = null; // 上一帧指尖相对掌心的归一化位置（轨迹球增量基准，手丢失时清空防跳变）
@@ -726,10 +718,11 @@
         btnCamRetry.classList.add('show');
         modeLineEl.textContent = '模拟模式 · 指针是手的位置';
         setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
-        hintEl.textContent = '模拟模式：按住 = 握拳收成小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 拨转土星（左右拖 = 左右翻，上下拖 = 上下翻，无上限可转满 360°，松手停在当前朝向）';
+        hintEl.textContent = '模拟模式：按住 = 收紧成紧凑小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 拨转整个粒子云（发散成星尘也能整体翻转，无上限可转满 360°，松手停在当前朝向）';
         target.handPresent = true;
         target.cx = anim.cx; target.cy = anim.cy;
         target.open = simOpen;
+        target.pinchAmt = 0;
         simYaw = 0; simPitch = 0;
         target.rotYaw = 0; target.rotPitch = 0; target.rotRoll = 0;
         if (reason) showNotice(reason + '，已切换到模拟模式', 6500);
@@ -769,7 +762,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '握紧手土星收小成形，张开发散成星尘；伸指在空中划动，像拨地球仪一样自由翻转土星（可转满 360°）';
+          hintEl.textContent = '放松就是一颗完整土星；张开发散成星尘，拇指贴近食指越捏越紧凑（握拳也可）；伸指在空中划动，成形与发散状态都能整体翻转（可转满 360°）';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -996,8 +989,7 @@
         /* —— 摄像头模式下，手消失超时 —— */
         if (inputMode === 'camera' && target.handPresent && now - lastHandAt > 500){
           target.handPresent = false;
-          target.pinch = false;
-          pinchLatched = false;
+          target.pinchAmt = 0; // 手离开：捏合目标清零，配合 open 回中 → 回到标准土星
           prevTipRel = null; // 轨迹球增量基准清空：手重新出现时不产生跳变增量
           prevPalmC = null;
         }
@@ -1009,11 +1001,13 @@
         var wantCx = target.handPresent ? target.cx : idleCx;
         var wantCy = target.handPresent ? target.cy : idleCy;
         var wantOpen = target.handPresent ? target.open : 0.55;
+        var wantPinch = target.handPresent ? target.pinchAmt : 0; // 无手时捏合归零：默认态 = 标准土星
         var posK = 1 - Math.pow(0.0001, dtMs / 1000); // 约百毫秒级平滑
         var openK = 1 - Math.pow(0.0005, dtMs / 1000);
         anim.cx += (wantCx - anim.cx) * Math.min(1, posK * 1.6);
         anim.cy += (wantCy - anim.cy) * Math.min(1, posK * 1.6);
         anim.open += (wantOpen - anim.open) * Math.min(1, openK);
+        anim.pinch += (wantPinch - anim.pinch) * Math.min(1, openK);
         refreshGestureLabel();
 
         /* —— 性能自适应（分档降级：先降拖尾 → 再降分辨率 → 最后才降粒子数；帧率恢复时反向升档） —— */
@@ -1039,13 +1033,15 @@
         ctx.fillStyle = 'rgba(3,4,12,' + (qStage >= 1 ? 0.30 : 0.16).toFixed(3) + ')';
         ctx.fillRect(0, 0, W, H);
 
-        /* —— 图形几何：张合度连续驱动 收小 → 标准 → 发散 ——
-           任何张合度下土星都保持完整形状：球核、光环、两者空隙的比例恒定，只整体缩放。
-           握紧 = 等比收小、更紧凑更亮；半开 = 标准大小（最清晰）；
-           张开 = 略放大一点后开始溶解。neb：0 = 完整土星 → 1 = 完全发散成星云 */
+        /* —— 图形几何：三条独立通道，互不抢 ——
+           · 发散只由张合度驱动：open 过中段(0.55)才开始溶解，张满 = 满屏星尘（neb 0→1）；
+           · 紧凑由捏合主驱动（anim.pinch 连续量），握拳是第二来源，两者取更强的一个；
+             紧凑 = 整颗土星等比缩放，球核/光环/空隙比例恒定，到底 0.52 倍标准大小；
+           · 两条通道都不动时（放松/无手）就是标准大小的完整土星。 */
         var neb = smooth01((anim.open - 0.55) / 0.45);
-        var compact = Math.max(0, 1 - anim.open / 0.55);            // 握紧程度：1 = 握紧，0 = 半开及以上
-        var scaleAll = (0.52 + 0.48 * Math.min(1, anim.open / 0.55)) * (1 + neb * 0.10);
+        var fistAmt = Math.max(0, 1 - anim.open / 0.55);            // 握拳紧凑量：open 越低越强
+        var compact = Math.max(anim.pinch, fistAmt);                // 紧凑度：捏合与握拳取更强者
+        var scaleAll = (1 - 0.48 * compact) * (1 + neb * 0.10);
         var R = Math.min(W, H) * 0.30 * scaleAll;
 
         /* —— 旋转：整颗土星的刚性姿态角，由指尖轨迹球累加的 yaw/pitch 驱动 ——
@@ -1077,8 +1073,10 @@
         var kSpring = 0.08 + compact * 0.02 - neb * 0.022, dampF = Math.pow(0.86 + neb * 0.05, dt);
 
         for (var i = 0; i < activeCount; i++){
-          // 本体坐标：粒子在土星模型里的固定位置（球核点 / 光环平面点），比例永不改变；
-          // 只有发散时才叠加随机散开偏移与漂移，把完整土星连续溶成星云
+          // 本地坐标 = 本体位置×缩放 + 发散偏移：发散偏移和本体位置同在一个本地系里，
+          // 下面统一乘整体旋转 R —— 目标位置 = R · (本体 + 发散偏移)。
+          // 所以发散成星尘后，指尖翻转转的是整片粒子云（像一张盘整体翻转/倾斜），不只是成形土星。
+          // 本体位置（球核点 / 光环平面点）比例永不改变；发散时才叠加随机散开偏移与漂移。
           var indiv = 1 + neb * 0.18 * spread[i];
           var bx = baseX[i] * indiv + scatX[i] * neb * 2.1 + Math.sin(t * 0.6 * pTw[i] + pPhase[i] * 1.7) * 0.09 * neb;
           var by = baseY[i] * indiv + scatY[i] * neb * 2.1 + Math.cos(t * 0.5 * pTw[i] + pPhase[i] * 2.3) * 0.09 * neb;
