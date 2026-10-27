@@ -197,7 +197,7 @@
 
     <header>
       <h1>土星 · 随手而生</h1>
-      <p id="hint">握拳土星收小成形，张开发散成星云，翻转手掌土星跟着 3D 翻转</p>
+      <p id="hint">握拳土星收小成形，张开发散成星云，指尖在空中划动土星跟着自由翻转</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
@@ -220,9 +220,9 @@
           <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>握拳 / 收拢</b>　土星整体收小变紧凑——球核、光环与空隙的比例不变，只是更小更亮</span></div>
           <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>半开手掌</b>　土星完整成形，球核与光环最清晰</span></div>
           <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘</span></div>
-          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>翻转手掌</b>　手掌侧过来、翻过去，土星跟着 3D 翻转——能翻到光环只剩一条线，再翻到另一侧</span></div>
+          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>指尖划动</b>　伸着食指在空中划动，像拨地球仪一样拨土星——上下左右自由翻转，可以连续转满 360°，指尖停下土星就停住</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：旋转改由手掌朝向驱动——手掌怎么翻，土星就怎么翻，能翻到光环成一条线再翻过去，不再只是平面里打转。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：旋转改由指尖直接拨动——指尖在空中划到哪，土星就跟着翻到哪，没有角度上限、不会自己转回去；整只手平移只带动土星移动，不会误转。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -479,11 +479,11 @@
         open: 0.55,
         handPresent: false,
         pinch: false,
-        rotYaw: 0,             // 掌面法线分解出的左右翻转角（出平面）
-        rotPitch: 0,           // 掌面法线分解出的上下翻转角（出平面）
-        rotRoll: 0             // 平面内倾斜角（小权重辅助）
+        rotYaw: 0,             // 指尖轨迹球累加的左右翻转角（无上限，可转满 360°）
+        rotPitch: 0,           // 指尖轨迹球累加的上下翻转角（无上限，可转满 360°）
+        rotRoll: 0             // 已停用（轨迹球驱动不需要平面 roll）
       };
-      // 用户驱动的朝向（平滑后）：yaw/pitch 由掌面法线直接映射，roll 只作小权重辅助
+      // 用户驱动的朝向（平滑后）：由指尖相对掌心的位移增量逐帧累加，不回中
       var rotUser = { yaw: 0, pitch: 0, roll: 0 };
       var inputMode = 'none'; // 'camera' | 'sim'
       var gestureLabel = '未检测到手';
@@ -589,47 +589,44 @@
         target.handPresent = true;
         lastHandAt = performance.now();
 
-        // 旋转：用关键点的三维坐标估掌面法线，再分解成出平面翻转角。
-        // 只取画面里的 2D 夹角永远翻不出平面——法线带 z 分量：手掌正对镜头 →
-        // 侧过来（掌缘对镜头）→ 翻向另一侧，法线随之扫过 ±90°，土星就能跟着
-        // 翻到「环看成一条线」再翻过去。
-        var nax = lm[17].x - lm[5].x, nay = lm[17].y - lm[5].y, naz = (lm[17].z || 0) - (lm[5].z || 0);
-        var nbx = lm[9].x - lm[0].x, nby = lm[9].y - lm[0].y, nbz = (lm[9].z || 0) - (lm[0].z || 0);
-        var nnx = nay * nbz - naz * nby;
-        var nny = naz * nbx - nax * nbz;
-        var nnz = nax * nby - nay * nbx;
-        var nnl = Math.sqrt(nnx * nnx + nny * nny + nnz * nnz);
-        if (nnl > 1e-6){
-          nnx /= nnl; nny /= nnl; nnz /= nnl;
-          if (smNormal){
-            // 法线符号有二义性：与上一帧保持同向，避免翻面瞬间整幅跳变
-            if (nnx * smNormal.x + nny * smNormal.y + nnz * smNormal.z < 0){ nnx = -nnx; nny = -nny; nnz = -nnz; }
-            // 低通平滑压噪声：系数 0.45 压得住抖动，又不会把翻转幅度吃掉
-            smNormal.x += (nnx - smNormal.x) * 0.45;
-            smNormal.y += (nny - smNormal.y) * 0.45;
-            smNormal.z += (nnz - smNormal.z) * 0.45;
-            var sl = Math.sqrt(smNormal.x * smNormal.x + smNormal.y * smNormal.y + smNormal.z * smNormal.z) || 1;
-            smNormal.x /= sl; smNormal.y /= sl; smNormal.z /= sl;
+        // 旋转：指尖轨迹球——不再估手掌朝向，改吃「增量」。
+        // 驱动量 = 食指指尖(8) 相对掌心中心(cxN,cyN) 的位置，按手掌尺度归一化；
+        // 每帧取相对位置的增量累加进 yaw/pitch，不设上限、不回中：
+        // 指尖在空中反复划动就能一圈圈转满 360°，任意方向自由翻；
+        // 指尖停下，增量为 0，土星就停在当前朝向。
+        // 关键去耦：整只手平移时指尖与掌心同步移动、相对增量≈0，
+        // 所以「土星跟随掌心移动」和「指尖拨转」互不干扰。
+        // x 取负：画面是自拍镜像，指尖在屏幕里向右划 → yaw 正向（与模拟拖动同向）。
+        var tipRelX = -((lm[8].x - cxN) / palmRef);
+        var tipRelY = (lm[8].y - cyN) / palmRef;
+        if (prevTipRel && prevPalmC){
+          var dYaw = 0, dPitch = 0;
+          if (open < 0.35){
+            // 握拳时指尖被估算、精度差：改用掌心中心本身的移动增量拨转
+            // （位置跟随仍在，两者各半：手移到哪土星跟到哪，同时被拨着转）
+            var pdx = -(cxN - prevPalmC.x);
+            var pdy = cyN - prevPalmC.y;
+            if (Math.abs(pdx) < 0.0006) pdx = 0; // 死区压抖动
+            if (Math.abs(pdy) < 0.0006) pdy = 0;
+            dYaw = pdx * 7.0;   // 掌心划过约 1/4 画面 ≈ 转 100°
+            dPitch = pdy * 7.0;
           } else {
-            if (nnz > 0){ nnx = -nnx; nny = -nny; nnz = -nnz; } // 首次出现先假定掌面朝向镜头（左右手都成立）
-            smNormal = { x: nnx, y: nny, z: nnz };
+            var rdx = tipRelX - prevTipRel.x;
+            var rdy = tipRelY - prevTipRel.y;
+            if (Math.abs(rdx) < 0.0012) rdx = 0; // 死区：静止时识别抖动不许把土星慢慢带偏
+            if (Math.abs(rdy) < 0.0012) rdy = 0;
+            dYaw = rdx * 4.4;   // 指尖划过约半个手掌宽度(0.5) ≈ 转 126°
+            dPitch = rdy * 4.4;
           }
-          // 掌面正对镜头时法线约为 (0,0,-1)：x 分量 → 左右翻，y 分量 → 上下翻。
-          // pitch 用 asin(ny) 而不是 atan2：纯左右翻经过掌缘正对镜头（nz≈0）时，
-          // atan2(ny, -nz) 会在 0 附近跳到 ±π，让土星莫名其妙多翻一个上下跟头
-          var facing = -smNormal.z;
-          var yawT = Math.atan2(smNormal.x, facing);
-          var pitchT = Math.asin(smNormal.y < -1 ? -1 : (smNormal.y > 1 ? 1 : smNormal.y));
-          if (yawT < -1.5) yawT = -1.5; else if (yawT > 1.5) yawT = 1.5;     // ±86°，越过 edge-on
-          if (pitchT < -1.5) pitchT = -1.5; else if (pitchT > 1.5) pitchT = 1.5;
-          target.rotYaw = -yawT;   // 画面是自拍镜像，左右翻取负与镜像一致
-          target.rotPitch = pitchT;
+          // 单帧增量限幅：识别跳变/换手瞬间的大跳不许变成一次猛甩
+          if (dYaw < -0.4) dYaw = -0.4; else if (dYaw > 0.4) dYaw = 0.4;
+          if (dPitch < -0.4) dPitch = -0.4; else if (dPitch > 0.4) dPitch = 0.4;
+          target.rotYaw += dYaw;
+          target.rotPitch += dPitch;
         }
-        // 平面内 roll 只作小权重辅助（拧手腕时画面里那点倾斜感），不顶替出平面翻转
-        var tvx = lm[9].x - lm[0].x, tvy = lm[9].y - lm[0].y;
-        var rollT = Math.atan2(tvx, -tvy) * 0.3;
-        if (rollT < -0.55) rollT = -0.55; else if (rollT > 0.55) rollT = 0.55;
-        target.rotRoll = -rollT;
+        prevTipRel = { x: tipRelX, y: tipRelY };
+        prevPalmC = { x: cxN, y: cyN };
+        target.rotRoll = 0;
 
         // 捏合：拇指尖↔食指尖距离（带迟滞防抖）
         var pinchRatio = lmDist(lm[4], lm[8]) / palmRef;
@@ -647,7 +644,8 @@
         }
       }
       var lastHandAt = 0;
-      var smNormal = null; // 平滑后的掌面法线（手丢失时清空，下次重新估计）
+      var prevTipRel = null; // 上一帧指尖相对掌心的归一化位置（轨迹球增量基准，手丢失时清空防跳变）
+      var prevPalmC = null;  // 上一帧掌心中心（归一化画面坐标，握拳时用它的增量拨转）
 
       /* ================= 摄像头 + MediaPipe Hands ================= */
       var handsObj = null;
@@ -728,7 +726,7 @@
         btnCamRetry.classList.add('show');
         modeLineEl.textContent = '模拟模式 · 指针是手的位置';
         setDiag(reason ? ('自检：识别出错：' + reason) : '自检：模拟模式，未启用识别模型');
-        hintEl.textContent = '模拟模式：按住 = 握拳收成小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 翻转土星（左右拖 = 左右翻，上下拖 = 上下翻）';
+        hintEl.textContent = '模拟模式：按住 = 握拳收成小土星，松开 = 标准土星，滚轮推满 = 发散，拖动 = 拨转土星（左右拖 = 左右翻，上下拖 = 上下翻，无上限可转满 360°，松手停在当前朝向）';
         target.handPresent = true;
         target.cx = anim.cx; target.cy = anim.cy;
         target.open = simOpen;
@@ -771,7 +769,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '握紧手土星收小成形，张开发散成星尘；翻转手掌，土星跟着在 3D 里翻转';
+          hintEl.textContent = '握紧手土星收小成形，张开发散成星尘；伸指在空中划动，像拨地球仪一样自由翻转土星（可转满 360°）';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -895,7 +893,7 @@
 
       /* ================= 模拟模式输入 ================= */
       var simOpen = 0.5; // 默认停在「成形」档，图形最清晰
-      var simYaw = 0, simPitch = 0; // 模拟模式的翻转目标角（拖动驱动，与手掌法线同一套目标）
+      var simYaw = 0, simPitch = 0; // 模拟模式的轨迹球累加角（拖动驱动，与指尖轨迹球同一套目标，无上限、不回中）
       var simDownCount = 0; // 当前按住的指针数（0 时翻转角缓回中立）
       var simHolding = false;
       var activePointers = {};
@@ -908,15 +906,14 @@
       }
       canvas.addEventListener('pointermove', function(e){
         if (inputMode !== 'sim') return;
-        // 拖动 = 翻转土星：横向拖 → 左右翻（yaw），竖直拖 → 上下翻（pitch）
+        // 拖动 = 轨迹球拨转（与摄像头指尖轨迹球同口径）：横向拖 → 左右翻（yaw），
+        // 竖直拖 → 上下翻（pitch），增量累加、无上限——反复拖就能转满 360°
         var prevP = activePointers[e.pointerId];
         if (prevP && e.buttons > 0){
           var mdx = e.clientX - prevP.x, mdy = e.clientY - prevP.y;
           if (mdx || mdy){
-            simYaw += mdx * 0.006;
-            simPitch += mdy * 0.006;
-            if (simYaw < -1.5) simYaw = -1.5; else if (simYaw > 1.5) simYaw = 1.5;
-            if (simPitch < -1.5) simPitch = -1.5; else if (simPitch > 1.5) simPitch = 1.5;
+            simYaw += mdx * 0.007;
+            simPitch += mdy * 0.007;
             target.rotYaw = simYaw;
             target.rotPitch = simPitch;
           }
@@ -1001,16 +998,11 @@
           target.handPresent = false;
           target.pinch = false;
           pinchLatched = false;
-          smNormal = null;
+          prevTipRel = null; // 轨迹球增量基准清空：手重新出现时不产生跳变增量
+          prevPalmC = null;
         }
 
-        /* —— 模拟模式：松开指针后，翻转角缓回中立（和摄像头模式手丢失时一致） —— */
-        if (inputMode === 'sim' && simDownCount === 0){
-          var backK = Math.pow(0.35, dtMs / 1000);
-          simYaw *= backK; simPitch *= backK;
-          target.rotYaw = simYaw;
-          target.rotPitch = simPitch;
-        }
+        /* —— 轨迹球朝向不回中：手指/指针停下，土星就停在当前朝向（无回中逻辑） —— */
 
         /* —— 平滑跟随（防抖）：位置、张合度向目标趋近 —— */
         var idleCx = W / 2, idleCy = H * 0.46;
@@ -1056,20 +1048,20 @@
         var scaleAll = (0.52 + 0.48 * Math.min(1, anim.open / 0.55)) * (1 + neb * 0.10);
         var R = Math.min(W, H) * 0.30 * scaleAll;
 
-        /* —— 旋转：整颗土星的刚性姿态角，由掌面法线的 yaw/pitch 直接驱动 ——
-           yaw → 绕 Y 轴左右翻；pitch → 绕 X 轴上下翻（叠在 0.60 的经典侧倾上，
-           能一路翻过「环成一条线」的 edge-on 再翻到另一侧）；roll 只作小权重平面辅助。
-           手不在时朝向缓回中立，土星自己缓慢自转展示 */
-        var wantYaw = target.handPresent ? target.rotYaw : 0;
-        var wantPitch = target.handPresent ? target.rotPitch : 0;
-        var wantRoll = target.handPresent ? target.rotRoll : 0;
+        /* —— 旋转：整颗土星的刚性姿态角，由指尖轨迹球累加的 yaw/pitch 驱动 ——
+           yaw → 绕 Y 轴左右翻；pitch → 绕 X 轴上下翻（叠在 0.60 的经典侧倾上）。
+           两角都是增量累加、无上限、不回中：cos/sin 天然按 2π 周期wrap，
+           转满一圈回到原样、可以继续往下转；手不在时朝向保持，
+           只有极慢的待机自转（绕自身轴）作展示，不盖过手指驱动 */
+        var wantYaw = target.rotYaw;
+        var wantPitch = target.rotPitch;
+        var wantRoll = 0;
         var rotK = 1 - Math.pow(0.00005, dtMs / 1000); // 跟随略硬一点，翻转跟手、干脆
         rotUser.yaw += (wantYaw - rotUser.yaw) * Math.min(1, rotK);
         rotUser.pitch += (wantPitch - rotUser.pitch) * Math.min(1, rotK);
         rotUser.roll += (wantRoll - rotUser.roll) * Math.min(1, rotK);
         if (!target.handPresent) rotY += dt * 0.05;
         var tiltX = 0.60 + rotUser.pitch;
-        if (tiltX < -1.25) tiltX = -1.25; else if (tiltX > 1.62) tiltX = 1.62;
         // 注意旋转次序：自转 rotY 绕的是环自身的轴（只带动纹理/粒子沿环走）；
         // 用户 yaw 必须在俯仰之后、绕屏幕竖轴再转一次，环面才会真的左右翻过去——
         // 若把 yaw 并进自转角，环面朝向永远不变（这正是之前「只能平面转」的另一半根因）
