@@ -197,7 +197,7 @@
 
     <header>
       <h1>土星 · 随手而生</h1>
-      <p id="hint">土星固定在画面中央：张开发散成星尘，捏合变得紧凑，指尖划动在任何状态下都能整体翻转</p>
+      <p id="hint">土星固定在画面中央：张开发散成星尘，捏合变得紧凑；伸出食指划动翻转，换个手势就定格，可一笔一笔接着翻</p>
       <div><span id="notice" role="status"></span></div>
     </header>
 
@@ -220,9 +220,9 @@
           <div class="row"><span class="dot" style="background:#b79aff"></span><span><b>放松手掌</b>　一颗标准大小的完整土星——球核、光环与中间的空隙都清清楚楚；手离开画面，它也回到这个样子</span></div>
           <div class="row"><span class="dot" style="background:#d9ccff"></span><span><b>完全张开</b>　土星溶解，发散成满屏紫色星尘；手一收拢，星尘就汇聚回土星</span></div>
           <div class="row"><span class="dot" style="background:#8b6ff0"></span><span><b>捏合手指</b>　拇指尖贴近食指尖——越贴近，土星越紧凑：整体等比缩小收紧，比例不变；松开就平滑恢复。握拳收拢也能收紧</span></div>
-          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>指尖划动</b>　伸着食指在空中划动，像拨地球仪一样拨动整个粒子云——成形时翻转土星，发散成星尘时整片星尘像一张盘一样跟着翻转倾斜；上下左右自由翻，可以连续转满 360°</span></div>
+          <div class="row"><span class="dot" style="background:#7a5fd0"></span><span><b>食指划动翻转</b>　伸出食指、其余手指收起，像握着笔一样划动指尖来拨转土星；一笔划完，换个手势（张开、握拳或放下手）朝向就定格——手挪回去再伸食指划下一笔，转角一笔一笔累加，上下左右自由翻，想转满几圈都行</span></div>
         </div>
-        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：土星固定在画面正中央，不再跟着手到处跑——你的手只管三件事：张合发散、捏合紧凑（握拳也可）、指尖划动翻转；位置定住了，翻转稳得多。没有手时，它也停在中央保持标准成形态。</p>
+        <p class="privacy" style="margin-top:16px;color:rgba(205,188,255,.88)">本次更新：翻转改成「一笔一笔划」——只有伸出食指的指向手势才接通翻转：划一笔转一段，换个手势立刻定格，手可以随便挪回去，再伸食指接着划、接着转，不会再被回程的手把刚转好的角度抵消掉。土星依然固定在画面正中央，张合发散、捏合紧凑（握拳也可）不变；没有手时，它停在中央保持标准成形态。</p>
         <button id="btnCam" type="button">开启摄像头</button>
         <button id="btnSim" type="button">没有摄像头？用手指 / 鼠标模拟</button>
         <p id="startError"></p>
@@ -472,15 +472,17 @@
       var anim = {
         cx: 0, cy: 0,          // 图形中心（锁定在画面正中央，不跟随任何输入平移）
         open: 0.55,            // 张合度 0=握拳 1=完全张开（平滑，只驱动发散）
-        pinch: 0               // 捏合度 0=松开 1=两指贴紧（平滑，驱动紧凑）
+        pinch: 0,              // 捏合度 0=松开 1=两指贴紧（平滑，驱动紧凑）
+        fist: 0                // 握拳紧凑量（平滑；已在手势层按食指蜷起与否把关）
       };
       // 原始目标（由摄像头手势或模拟输入写入）
       var target = {
         open: 0.55,
         handPresent: false,
         pinchAmt: 0,           // 连续捏合度（拇指尖↔食指尖距离归一化），不再是触发开关
-        rotYaw: 0,             // 指尖轨迹球累加的左右翻转角（无上限，可转满 360°）
-        rotPitch: 0,           // 指尖轨迹球累加的上下翻转角（无上限，可转满 360°）
+        fistAmt: 0,            // 握拳紧凑目标量（仅食指也蜷起时才由张合度导出，指向姿势下恒为 0）
+        rotYaw: 0,             // 离合式划动累加的左右翻转角（无上限，可转满 360°）
+        rotPitch: 0,           // 离合式划动累加的上下翻转角（无上限，可转满 360°）
         rotRoll: 0             // 已停用（轨迹球驱动不需要平面 roll）
       };
       // 用户驱动的朝向（平滑后）：由指尖相对掌心的位移增量逐帧累加，不回中
@@ -515,8 +517,9 @@
         if (inputMode === 'camera' && resultsCount === 0){ gestureLabel = '引擎启动中…'; }
         else if (inputMode === 'camera' && !target.handPresent){ gestureLabel = '未检测到手'; }
         else if (anim.open > 0.78){ gestureLabel = '✋ 张开 · 发散'; }
+        else if (inputMode === 'camera' && clutchOn){ gestureLabel = '👆 划动翻转中'; }
         else if (anim.pinch > 0.45){ gestureLabel = '🤏 捏合 · 紧凑'; }
-        else if (anim.open < 0.32){ gestureLabel = '✊ 握拳 · 紧凑'; }
+        else if (anim.fist > 0.45 || anim.open < 0.32){ gestureLabel = '✊ 握拳 · 紧凑'; }
         else { gestureLabel = '✋ 放松 · 土星'; }
         setStatus(gestureLabel);
       }
@@ -575,50 +578,65 @@
         if (open < 0) open = 0; else if (open > 1) open = 1;
         target.open = open;
 
-        // 掌心中心（归一化坐标）：只作轨迹球的相对基准与握拳拨转的增量来源；
+        // 掌心中心（归一化坐标）：只作指尖相对位置的基准（离合划动的增量来源）；
         // 粒子团位置已锁定在画面正中央，手的位置不再驱动任何平移
         var cxN = (lm[0].x + lm[5].x + lm[9].x + lm[13].x + lm[17].x) / 5;
         var cyN = (lm[0].y + lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 5;
         target.handPresent = true;
         lastHandAt = performance.now();
 
-        // 旋转：指尖轨迹球——不再估手掌朝向，改吃「增量」。
-        // 驱动量 = 食指指尖(8) 相对掌心中心(cxN,cyN) 的位置，按手掌尺度归一化；
-        // 每帧取相对位置的增量累加进 yaw/pitch，不设上限、不回中：
-        // 指尖在空中反复划动就能一圈圈转满 360°，任意方向自由翻；
-        // 指尖停下，增量为 0，土星就停在当前朝向。
-        // 关键去耦：整只手平移时指尖与掌心同步移动、相对增量≈0，不会误触发翻转；
-        // 土星位置固定在画面中央，本来就没有任何平移输入。
+        // 手指伸直程度：指尖到腕距离 / 指节(PIP)到腕距离——伸直明显大于 1，蜷起约等于或小于 1。
+        // 用它判定「指向姿势」（离合开关），以及食指是否蜷起（握拳紧凑的门）。
+        var idxExt = lmDist(lm[8], lm[0]) / Math.max(0.001, lmDist(lm[6], lm[0]));
+        var midExt = lmDist(lm[12], lm[0]) / Math.max(0.001, lmDist(lm[10], lm[0]));
+        var ringExt = lmDist(lm[16], lm[0]) / Math.max(0.001, lmDist(lm[14], lm[0]));
+        var pinkExt = lmDist(lm[20], lm[0]) / Math.max(0.001, lmDist(lm[18], lm[0]));
+        // 指向姿势：食指伸直、中/无名/小指蜷起。接通与断开用不同门限（迟滞），防姿势边缘抖动反复开关
+        var pointing;
+        if (clutchOn){
+          pointing = !(idxExt < 1.08 || midExt > 1.16 || ringExt > 1.16 || pinkExt > 1.16);
+        } else {
+          pointing = idxExt > 1.16 && midExt < 1.08 && ringExt < 1.08 && pinkExt < 1.08;
+        }
+
+        // 握拳紧凑的目标量：只有食指也蜷起时，张合度低才算握拳。
+        // 指向姿势下中指等蜷起会把张合度读数拉低，但那不是握拳，不得据此把土星收紧。
+        target.fistAmt = idxExt < 1.10 ? Math.max(0, 1 - open / 0.55) : 0;
+
+        // 旋转：离合式划动——只有指向姿势接通时，才吃指尖相对掌心的增量。
+        // 驱动量 = 食指指尖(8) 相对掌心中心(cxN,cyN) 的位置（按手掌尺度归一化）的逐帧增量，
+        // 累加进 yaw/pitch，不设上限、不回中：一笔划一段，换个手势立刻定格，
+        // 手随便挪回去准备下一笔，再伸食指接着划——转角一笔笔累加（可转满 360° 的任意倍数）。
+        // 关键差别（对旧轨迹球）：回程发生在断开状态，增量根本不被读取，
+        // 不会把刚转好的角度又抵消回去；接通瞬间以当前指尖相对位置为零点重置基准，
+        // 本帧不累加，杜绝接通跳变；断开后基准作废。
+        // 整只手平移时指尖与掌心同步移动、相对增量≈0，接通中也不会误触发翻转。
         // x 取负：画面是自拍镜像，指尖在屏幕里向右划 → yaw 正向（与模拟拖动同向）。
         var tipRelX = -((lm[8].x - cxN) / palmRef);
         var tipRelY = (lm[8].y - cyN) / palmRef;
-        if (prevTipRel && prevPalmC){
-          var dYaw = 0, dPitch = 0;
-          if (open < 0.35){
-            // 握拳时指尖被估算、精度差：改用掌心中心本身的移动增量拨转
-            // （纯增量输入：只拨转，不产生任何位置移动）
-            var pdx = -(cxN - prevPalmC.x);
-            var pdy = cyN - prevPalmC.y;
-            if (Math.abs(pdx) < 0.0006) pdx = 0; // 死区压抖动
-            if (Math.abs(pdy) < 0.0006) pdy = 0;
-            dYaw = pdx * 7.0;   // 掌心划过约 1/4 画面 ≈ 转 100°
-            dPitch = pdy * 7.0;
-          } else {
+        if (pointing){
+          if (!clutchOn){
+            clutchOn = true;
+            prevTipRel = { x: tipRelX, y: tipRelY }; // 接通帧只定零点，不产生转角
+          } else if (prevTipRel){
             var rdx = tipRelX - prevTipRel.x;
             var rdy = tipRelY - prevTipRel.y;
-            if (Math.abs(rdx) < 0.0012) rdx = 0; // 死区：静止时识别抖动不许把土星慢慢带偏
+            if (Math.abs(rdx) < 0.0012) rdx = 0; // 死区：识别抖动的小增量不许把土星慢慢带偏
             if (Math.abs(rdy) < 0.0012) rdy = 0;
-            dYaw = rdx * 4.4;   // 指尖划过约半个手掌宽度(0.5) ≈ 转 126°
-            dPitch = rdy * 4.4;
+            var dYaw = rdx * 4.8;   // 指尖划过约半个手掌宽度(0.5) ≈ 转 137°
+            var dPitch = rdy * 4.8;
+            // 单帧增量限幅：识别跳变的大跳不许变成一次猛甩
+            if (dYaw < -0.4) dYaw = -0.4; else if (dYaw > 0.4) dYaw = 0.4;
+            if (dPitch < -0.4) dPitch = -0.4; else if (dPitch > 0.4) dPitch = 0.4;
+            target.rotYaw += dYaw;
+            target.rotPitch += dPitch;
+            prevTipRel = { x: tipRelX, y: tipRelY };
           }
-          // 单帧增量限幅：识别跳变/换手瞬间的大跳不许变成一次猛甩
-          if (dYaw < -0.4) dYaw = -0.4; else if (dYaw > 0.4) dYaw = 0.4;
-          if (dPitch < -0.4) dPitch = -0.4; else if (dPitch > 0.4) dPitch = 0.4;
-          target.rotYaw += dYaw;
-          target.rotPitch += dPitch;
+        } else {
+          // 任何其他手势（张开/握拳/捏合/放松/指向结束）：旋转输入硬断开，朝向冻结——不吃增量、不回中
+          clutchOn = false;
+          prevTipRel = null;
         }
-        prevTipRel = { x: tipRelX, y: tipRelY };
-        prevPalmC = { x: cxN, y: cyN };
         target.rotRoll = 0;
 
         // 捏合度（连续映射，不是触发开关）：拇指尖(4)↔食指尖(8) 距离按手掌尺度归一化，
@@ -630,8 +648,8 @@
         target.pinchAmt = smooth01(pa);
       }
       var lastHandAt = 0;
-      var prevTipRel = null; // 上一帧指尖相对掌心的归一化位置（轨迹球增量基准，手丢失时清空防跳变）
-      var prevPalmC = null;  // 上一帧掌心中心（归一化画面坐标，握拳时用它的增量拨转）
+      var prevTipRel = null; // 离合接通时上一帧的指尖相对位置（增量基准）；断开即作废，接通瞬间重新定零点
+      var clutchOn = false;  // 离合状态：指向姿势（食指伸直、其余三指蜷起）接通旋转输入，其他手势硬定格
 
       /* ================= 摄像头 + MediaPipe Hands ================= */
       var handsObj = null;
@@ -716,6 +734,7 @@
         target.handPresent = true;
         target.open = simOpen;
         target.pinchAmt = 0;
+        target.fistAmt = 0;
         simYaw = 0; simPitch = 0;
         target.rotYaw = 0; target.rotPitch = 0; target.rotRoll = 0;
         if (reason) showNotice(reason + '，已切换到模拟模式', 6500);
@@ -755,7 +774,7 @@
           camPreview.classList.add('on');
           startScreen.classList.add('hidden');
           btnCamRetry.classList.remove('show');
-          hintEl.textContent = '土星固定在画面中央，不随手移动；放松就是一颗完整土星，张开发散成星尘，拇指贴近食指越捏越紧凑（握拳也可）；伸指在空中划动，成形与发散状态都能整体翻转（可转满 360°）';
+          hintEl.textContent = '土星固定在画面中央，不随手移动；放松就是一颗完整土星，张开发散成星尘，拇指贴近食指越捏越紧凑（握拳也可）；翻转只认指向手势：伸出食指、其余手指收起，划动来拨转，换个手势就定格，再伸食指接着划——转角一笔笔累加，可转满 360°';
           target.handPresent = false;
           showNotice('摄像头已开启，识别引擎正在加载（首次稍慢），把手放到镜头前试试', 4200);
         }).catch(function(err){
@@ -920,10 +939,12 @@
           pinchDist0 = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
           simOpenAtPinch = simOpen;
           simHolding = false;
+          target.fistAmt = 0;
           target.open = simOpen; // 双指模式：不进握拳，滑动直接调张合
         } else {
           simHolding = true;
           target.open = 0; // 单指按住 = 握拳
+          target.fistAmt = 1;
         }
       });
       function simRelease(e){
@@ -933,11 +954,11 @@
         if (remain === 0){
           simHolding = false;
           pinchDist0 = 0;
-          if (inputMode === 'sim') target.open = simOpen; // 松开 = 张开
+          if (inputMode === 'sim'){ target.open = simOpen; target.fistAmt = 0; } // 松开 = 张开
         } else if (remain === 1){
           pinchDist0 = 0;
           simHolding = true;
-          if (inputMode === 'sim') target.open = 0; // 剩一根手指还按着 = 握拳
+          if (inputMode === 'sim'){ target.open = 0; target.fistAmt = 1; } // 剩一根手指还按着 = 握拳
         }
       }
       window.addEventListener('pointerup', simRelease);
@@ -974,11 +995,13 @@
         if (inputMode === 'camera' && target.handPresent && now - lastHandAt > 500){
           target.handPresent = false;
           target.pinchAmt = 0; // 手离开：捏合目标清零，配合 open 回中 → 回到标准土星
-          prevTipRel = null; // 轨迹球增量基准清空：手重新出现时不产生跳变增量
-          prevPalmC = null;
+          target.fistAmt = 0;
+          clutchOn = false; // 手离开 = 离合断开，朝向定格在当前值
+          prevTipRel = null; // 增量基准清空：手重新出现、重新接通时重新定零点，不产生跳变
         }
 
-        /* —— 轨迹球朝向不回中：手指/指针停下，土星就停在当前朝向（无回中逻辑） —— */
+        /* —— 离合式朝向不回中：非指向手势下 target.rotYaw/rotPitch 根本不被改动，
+           朝向硬冻结；指向接通时才一笔笔累加（无回中逻辑） —— */
 
         /* —— 位置彻底锁定：中心永远在画面正中央，不随手、不随指尖、不随拖动平移；
            手的输入只剩张合 / 捏合 / 指尖翻转三条通道。下面的平滑只在窗口尺寸
@@ -986,12 +1009,14 @@
         var wantCx = W / 2, wantCy = H * 0.5;
         var wantOpen = target.handPresent ? target.open : 0.55;
         var wantPinch = target.handPresent ? target.pinchAmt : 0; // 无手时捏合归零：默认态 = 标准土星
+        var wantFist = target.handPresent ? target.fistAmt : 0;   // 无手时握拳量归零
         var posK = 1 - Math.pow(0.0001, dtMs / 1000); // 约百毫秒级平滑
         var openK = 1 - Math.pow(0.0005, dtMs / 1000);
         anim.cx += (wantCx - anim.cx) * Math.min(1, posK * 1.6);
         anim.cy += (wantCy - anim.cy) * Math.min(1, posK * 1.6);
         anim.open += (wantOpen - anim.open) * Math.min(1, openK);
         anim.pinch += (wantPinch - anim.pinch) * Math.min(1, openK);
+        anim.fist += (wantFist - anim.fist) * Math.min(1, openK);
         refreshGestureLabel();
 
         /* —— 性能自适应（分档降级：先降拖尾 → 再降分辨率 → 最后才降粒子数；帧率恢复时反向升档） —— */
@@ -1023,12 +1048,11 @@
              紧凑 = 整颗土星等比缩放，球核/光环/空隙比例恒定，到底 0.52 倍标准大小；
            · 两条通道都不动时（放松/无手）就是标准大小的完整土星。 */
         var neb = smooth01((anim.open - 0.55) / 0.45);
-        var fistAmt = Math.max(0, 1 - anim.open / 0.55);            // 握拳紧凑量：open 越低越强
-        var compact = Math.max(anim.pinch, fistAmt);                // 紧凑度：捏合与握拳取更强者
+        var compact = Math.max(anim.pinch, anim.fist);              // 紧凑度：捏合与握拳取更强者（握拳量已在手势层按食指蜷起把关，指向姿势不会误触发）
         var scaleAll = (1 - 0.48 * compact) * (1 + neb * 0.10);
         var R = Math.min(W, H) * 0.30 * scaleAll;
 
-        /* —— 旋转：整颗土星的刚性姿态角，由指尖轨迹球累加的 yaw/pitch 驱动 ——
+        /* —— 旋转：整颗土星的刚性姿态角，由离合式划动累加的 yaw/pitch 驱动 ——
            yaw → 绕 Y 轴左右翻；pitch → 绕 X 轴上下翻（叠在 0.60 的经典侧倾上）。
            两角都是增量累加、无上限、不回中：cos/sin 天然按 2π 周期wrap，
            转满一圈回到原样、可以继续往下转；手不在时朝向保持，
